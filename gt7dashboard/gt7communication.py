@@ -180,6 +180,8 @@ class GT7Communication(Thread):
         self.session = Session()
         self.laps = []
         self.last_data = GTData(None)
+        self._previous_speed_mps = None
+        self._previous_rotation_yaw = None
 
         # This is used to record race data in any case. This will override the "in_race" flag.
         # When recording data. Useful when recording replays.
@@ -238,6 +240,8 @@ class GT7Communication(Thread):
                                 curLapTime = 0
                                 # Reset lap
                                 self.current_lap = Lap()
+                                self._previous_speed_mps = None
+                                self._previous_rotation_yaw = None
 
                             self._log_data(self.last_data)
 
@@ -327,6 +331,33 @@ class GT7Communication(Thread):
         self.current_lap.data_braking.append(data.brake)
         self.current_lap.data_throttle.append(data.throttle)
         self.current_lap.data_speed.append(data.car_speed)
+
+        tick_rate_hz = 60.0
+        gravity = 9.80665
+        speed_mps = data.car_speed / 3.6
+
+        if self._previous_speed_mps is None:
+            accel_longitudinal_g = 0.0
+        else:
+            accel_longitudinal_g = ((speed_mps - self._previous_speed_mps) * tick_rate_hz) / gravity
+
+        if self._previous_rotation_yaw is None:
+            yaw_rate_rad_s = 0.0
+        else:
+            yaw_rate_rad_s = (data.rotation_yaw - self._previous_rotation_yaw) * tick_rate_hz
+
+        accel_lateral_g = (speed_mps * yaw_rate_rad_s) / gravity
+
+        accel_longitudinal_g = max(-3.0, min(3.0, accel_longitudinal_g))
+        accel_lateral_g = max(-3.0, min(3.0, accel_lateral_g))
+        accel_total_g = math.sqrt((accel_longitudinal_g * accel_longitudinal_g) + (accel_lateral_g * accel_lateral_g))
+
+        self.current_lap.data_accel_longitudinal_g.append(accel_longitudinal_g)
+        self.current_lap.data_accel_lateral_g.append(accel_lateral_g)
+        self.current_lap.data_accel_total_g.append(accel_total_g)
+
+        self._previous_speed_mps = speed_mps
+        self._previous_rotation_yaw = data.rotation_yaw
 
         delta_divisor = data.car_speed
         if data.car_speed == 0:
@@ -422,6 +453,8 @@ class GT7Communication(Thread):
         # Reset current lap with an empty one
         self.current_lap = Lap()
         self.current_lap.fuel_at_start = self.last_data.current_fuel
+        self._previous_speed_mps = None
+        self._previous_rotation_yaw = None
 
 
     def reset(self):
@@ -432,6 +465,8 @@ class GT7Communication(Thread):
         self.session = Session()
         self.last_data = GTData(None)
         self.laps = []
+        self._previous_speed_mps = None
+        self._previous_rotation_yaw = None
 
     def set_lap_callback(self, new_lap_callback):
         self.lap_callback_function = new_lap_callback

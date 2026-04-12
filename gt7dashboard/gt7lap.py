@@ -1,4 +1,5 @@
 from datetime import datetime
+import math
 from gt7dashboard import gt7helper
 
 
@@ -45,6 +46,10 @@ class Lap:
         # Yaw Rate
         self.data_rotation_yaw = []
         self.data_absolute_yaw_rate_per_second = []
+        # Friction Circle (g)
+        self.data_accel_longitudinal_g = []
+        self.data_accel_lateral_g = []
+        self.data_accel_total_g = []
         # Car
         self.car_id = 0
 
@@ -99,6 +104,26 @@ class Lap:
         raceline_y_braking, raceline_x_braking, raceline_z_braking = gt7helper.get_race_line_coordinates_when_mode_is_active(self, mode=gt7helper.RACE_LINE_BRAKING_MODE)
         raceline_y_coasting, raceline_x_coasting, raceline_z_coasting = gt7helper.get_race_line_coordinates_when_mode_is_active(self, mode=gt7helper.RACE_LINE_COASTING_MODE)
 
+        expected_length = len(self.data_speed)
+
+        accel_longitudinal = list(getattr(self, "data_accel_longitudinal_g", []))
+        accel_lateral = list(getattr(self, "data_accel_lateral_g", []))
+        accel_total = list(getattr(self, "data_accel_total_g", []))
+
+        if len(accel_longitudinal) < expected_length:
+            accel_longitudinal.extend([0.0] * (expected_length - len(accel_longitudinal)))
+        if len(accel_lateral) < expected_length:
+            accel_lateral.extend([0.0] * (expected_length - len(accel_lateral)))
+
+        accel_longitudinal = accel_longitudinal[:expected_length]
+        accel_lateral = accel_lateral[:expected_length]
+
+        if len(accel_total) != expected_length:
+            accel_total = [
+                math.sqrt((ax * ax) + (ay * ay))
+                for ax, ay in zip(accel_longitudinal, accel_lateral)
+            ]
+
         data = {
             "throttle": self.data_throttle,
             "brake": self.data_braking,
@@ -108,6 +133,9 @@ class Lap:
             "rpm": self.data_rpm,
             "boost": self.data_boost,
             "yaw_rate": self.data_absolute_yaw_rate_per_second,
+            "accel_longitudinal_g": accel_longitudinal,
+            "accel_lateral_g": accel_lateral,
+            "accel_total_g": accel_total,
             "gear": self.data_gear,
             "ticks": list(range(len(self.data_speed))),
             "coast": self.data_coasting,

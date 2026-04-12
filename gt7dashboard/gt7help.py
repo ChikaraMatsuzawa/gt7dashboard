@@ -68,6 +68,10 @@ The thinner line of the two is your last lap. The reference line is the thicker 
 """
 
 YAW_RATE_DIAGRAM = """This is the yaw rate per second of your car. Use this to determine the Maximum Rotation Point (MRP). At this point you should normally accelerate."""
+FRICTION_CIRCLE = """This diagram shows a real-time friction circle in g. The black marker is the current load point and the blue line is the recent trail.
+
+Use the zone color and the large total-g value to judge grip without staring at the chart.
+SAFE is low load, LIMIT is near grip, and OVER indicates high combined load."""
 
 
 def get_help_div(help_text_resource):

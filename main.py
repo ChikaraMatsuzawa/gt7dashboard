@@ -71,6 +71,10 @@ def update_fuel_map(step):
     div_fuel_map.text = gt7diagrams.get_fuel_map_html_table(last_lap)
 
 
+def update_friction_circle():
+    friction_circle_diagram.update_from_lap(app.gt7comm.current_lap)
+
+
 def update_race_lines(laps: List[Lap], reference_lap: Lap):
     """
     This function updates the race lines on the second tab with the amount of laps
@@ -371,6 +375,7 @@ stored_lap_files = gt7helper.bokeh_tuple_for_list_of_lapfiles(
 )
 
 race_diagram = gt7diagrams.RaceDiagram(width=1000)
+friction_circle_diagram = gt7diagrams.FrictionCircleDiagram(width=1400, height=900, history_seconds=6, tick_rate_hz=60)
 race_time_table = gt7diagrams.RaceTimeTable()
 colors = itertools.cycle(palette)
 
@@ -510,11 +515,21 @@ l3 = layout(
     sizing_mode="stretch_width",
 )
 
+l4 = layout(
+    [
+        [get_help_div(gt7help.FRICTION_CIRCLE), friction_circle_diagram.get_layout()],
+    ],
+    sizing_mode="stretch_both",
+)
+l4.align = "start"
+
 #  Setup the tabs
 tab1 = TabPanel(child=l1, title="Get Faster")
 tab2 = TabPanel(child=l2, title="Race Lines")
 tab3 = TabPanel(child=l3, title="Race")
-tabs = Tabs(tabs=[tab1, tab2, tab3])
+tab4 = TabPanel(child=l4, title="Friction Circle")
+tabs = Tabs(tabs=[tab1, tab2, tab3, tab4])
+tabs.sizing_mode = "stretch_both"
 
 curdoc().add_root(tabs)
 curdoc().title = "GT7 Dashboard"
@@ -522,3 +537,4 @@ curdoc().title = "GT7 Dashboard"
 # This will only trigger once per lap, but we check every second if anything happened
 curdoc().add_periodic_callback(update_lap_change, 1000)
 curdoc().add_periodic_callback(update_fuel_map, 5000)
+curdoc().add_periodic_callback(update_friction_circle, 200)

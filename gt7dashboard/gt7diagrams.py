@@ -1,8 +1,9 @@
 from typing import List
+import math
 
 import bokeh
 from bokeh.layouts import layout
-from bokeh.models import ColumnDataSource, Label, Scatter, Column, Line, TableColumn, DataTable, Range1d
+from bokeh.models import ColumnDataSource, Label, Scatter, Column, Line, TableColumn, DataTable, Range1d, Div, Span
 from bokeh.plotting import figure
 
 from gt7dashboard import gt7helper
@@ -557,6 +558,218 @@ class RaceDiagram(object):
 
 
 
+
+
+class FrictionCircleDiagram(object):
+    def __init__(self, width=520, height=520, history_seconds=6, tick_rate_hz=60):
+        self.max_g = 1.5
+        self.history_points = int(history_seconds * tick_rate_hz)
+        self._zone_state = "SAFE"
+        self._min_plot_side = min(width, height)
+        self.safe_ring_g = 0.70
+        self.limit_ring_g = 1.00
+        self.over_ring_g = 1.30
+        self.hysteresis_margin_g = 0.05
+        self.zone_styles = {
+            "SAFE": {
+                "fg": "#16a34a",
+                "bg": "#dcfce7",
+                "ring": "#16a34a",
+            },
+            "LIMIT": {
+                "fg": "#d97706",
+                "bg": "#fef3c7",
+                "ring": "#d97706",
+            },
+            "OVER": {
+                "fg": "#dc2626",
+                "bg": "#fee2e2",
+                "ring": "#dc2626",
+            },
+        }
+
+        self.f_friction = figure(
+            title="Friction Circle",
+            x_axis_label="Lateral g",
+            y_axis_label="Longitudinal g",
+            width=width,
+            height=height,
+            x_range=Range1d(-self.max_g, self.max_g),
+            y_range=Range1d(-self.max_g, self.max_g),
+            match_aspect=True,
+            tooltips=[
+                ("Lateral", "@accel_lateral_g{0.00} g"),
+                ("Longitudinal", "@accel_longitudinal_g{0.00} g"),
+                ("Total", "@accel_total_g{0.00} g"),
+            ],
+            active_drag="box_zoom",
+        )
+
+        self.f_friction.toolbar.autohide = True
+        self.f_friction.sizing_mode = "stretch_both"
+        self.f_friction.align = "start"
+        self.f_friction.min_width = self._min_plot_side
+        self.f_friction.min_height = self._min_plot_side
+        self.f_friction.xgrid.visible = False
+        self.f_friction.ygrid.visible = False
+        self.f_friction.background_fill_alpha = 0.35
+        self.f_friction.border_fill_alpha = 0.0
+
+        self._add_zone_rings()
+        self.f_friction.add_layout(Span(location=0, dimension="width", line_color="#5c6670", line_alpha=0.5, line_dash="dashed"))
+        self.f_friction.add_layout(Span(location=0, dimension="height", line_color="#5c6670", line_alpha=0.5, line_dash="dashed"))
+
+        self.source_trail = ColumnDataSource(
+            data={
+                "accel_lateral_g": [],
+                "accel_longitudinal_g": [],
+                "accel_total_g": [],
+            }
+        )
+        self.source_current = ColumnDataSource(
+            data={
+                "accel_lateral_g": [0.0],
+                "accel_longitudinal_g": [0.0],
+                "accel_total_g": [0.0],
+            }
+        )
+
+        self.f_friction.line(
+            x="accel_lateral_g",
+            y="accel_longitudinal_g",
+            source=self.source_trail,
+            line_width=2,
+            line_alpha=0.5,
+            color="#2563eb",
+            legend_label="Recent Trail",
+        )
+
+        self.f_friction.scatter(
+            x="accel_lateral_g",
+            y="accel_longitudinal_g",
+            source=self.source_current,
+            marker="circle",
+            size=14,
+            color="#111827",
+            line_color="#f59e0b",
+            line_width=2,
+            legend_label="Current",
+        )
+
+        self.f_friction.legend.location = "top_left"
+
+        self.div_current_total_g = Div(width=320, height=220, sizing_mode="fixed")
+
+        self._update_value_display(0.0)
+        self.layout = layout(children=[[self.f_friction, self.div_current_total_g]])
+        self.layout.sizing_mode = "stretch_both"
+        self.layout.align = "start"
+        self.layout.min_width = width + 320
+        self.layout.min_height = height
+
+    def _add_zone_rings(self):
+        zone_specs = [
+            (self.safe_ring_g, self.zone_styles["SAFE"]["ring"], "Safe"),
+            (self.limit_ring_g, self.zone_styles["LIMIT"]["ring"], "Limit"),
+            (self.over_ring_g, self.zone_styles["OVER"]["ring"], "Over"),
+        ]
+
+        points = 80
+        for radius, color, label in zone_specs:
+            xs = []
+            ys = []
+            for i in range(points + 1):
+                theta = 2 * math.pi * i / points
+                xs.append(radius * math.cos(theta))
+                ys.append(radius * math.sin(theta))
+
+            self.f_friction.line(xs, ys, line_color=color, line_alpha=0.7, line_width=2)
+            self.f_friction.text(
+                x=[radius],
+                y=[0.02],
+                text=[label],
+                text_font_size="9pt",
+                text_color=color,
+            )
+
+    def _update_value_display(self, total_g):
+        zone_name = self._get_zone_name(total_g)
+
+        zone_color = self.zone_styles[zone_name]["fg"]
+        background_color = self.zone_styles[zone_name]["bg"]
+        self.f_friction.background_fill_color = background_color
+
+        self.div_current_total_g.text = (
+            "<div style='height:100%;display:flex;align-items:center;justify-content:center;'>"
+            f"<span style='font-size:96px;font-weight:800;line-height:1;color:{zone_color};'>{total_g:.2f} g</span>"
+            "</div>"
+        )
+
+    def _get_zone_name(self, total_g):
+        # Hysteresis prevents rapid color flicker near boundaries.
+        limit_up = self.limit_ring_g
+        limit_down = self.limit_ring_g - self.hysteresis_margin_g
+        over_up = self.over_ring_g
+        over_down = self.over_ring_g - self.hysteresis_margin_g
+
+        if self._zone_state == "SAFE":
+            if total_g >= over_up:
+                self._zone_state = "OVER"
+            elif total_g >= limit_up:
+                self._zone_state = "LIMIT"
+        elif self._zone_state == "LIMIT":
+            if total_g >= over_up:
+                self._zone_state = "OVER"
+            elif total_g <= limit_down:
+                self._zone_state = "SAFE"
+        else:
+            if total_g <= over_down and total_g >= limit_up:
+                self._zone_state = "LIMIT"
+            elif total_g < limit_up:
+                self._zone_state = "SAFE"
+
+        return self._zone_state
+
+    def update_from_lap(self, lap: Lap):
+        longitudinal = lap.data_accel_longitudinal_g
+        lateral = lap.data_accel_lateral_g
+        total = lap.data_accel_total_g
+
+        if len(longitudinal) == 0 or len(longitudinal) != len(lateral):
+            self.source_trail.data = {
+                "accel_lateral_g": [],
+                "accel_longitudinal_g": [],
+                "accel_total_g": [],
+            }
+            self.source_current.data = {
+                "accel_lateral_g": [0.0],
+                "accel_longitudinal_g": [0.0],
+                "accel_total_g": [0.0],
+            }
+            self._update_value_display(0.0)
+            return
+
+        if len(total) != len(longitudinal):
+            total = [math.sqrt((ax * ax) + (ay * ay)) for ax, ay in zip(longitudinal, lateral)]
+
+        start_index = max(0, len(longitudinal) - self.history_points)
+
+        self.source_trail.data = {
+            "accel_lateral_g": lateral[start_index:],
+            "accel_longitudinal_g": longitudinal[start_index:],
+            "accel_total_g": total[start_index:],
+        }
+
+        self.source_current.data = {
+            "accel_lateral_g": [lateral[-1]],
+            "accel_longitudinal_g": [longitudinal[-1]],
+            "accel_total_g": [total[-1]],
+        }
+
+        self._update_value_display(total[-1])
+
+    def get_layout(self) -> Column:
+        return self.layout
 
 
 def add_annotations_to_race_line(
