@@ -1,3 +1,5 @@
+from html import escape
+
 from bokeh.models import Div
 
 from gt7dashboard import gt7helper
@@ -73,6 +75,7 @@ def get_help_div(help_text_resource):
 
 
 def get_help_text_resource(help_text_resource):
+    safe_help_text = escape(help_text_resource, quote=True)
     return f"""
-    <div title="{help_text_resource}">?⃝</div>
+    <div title="{safe_help_text}" style="display:inline-flex;align-items:center;justify-content:center;width:1.05em;height:1.05em;border:1px solid currentColor;border-radius:50%;font-size:11px;line-height:1;cursor:help;">?</div>
     """
