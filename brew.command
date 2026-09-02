@@ -5,6 +5,9 @@
 
 cd "$(dirname "$0")"
 
+# Use C telemetry by default while allowing callers to request another format.
+export GT7_PACKET_FORMAT="${GT7_PACKET_FORMAT:-C}"
+
 # Python 3.14 does not have precompiled wheels for scipy/pandas, causing compilation errors.
 # Prefer Python 3.13 or 3.12 if they are available.
 PYTHON_BIN="python3"
@@ -15,6 +18,7 @@ elif command -v python3.12 &>/dev/null; then
 fi
 
 echo "Using Python binary: $PYTHON_BIN"
+echo "Using GT7 packet format: $GT7_PACKET_FORMAT"
 
 # Remove existing virtual environment to avoid Python version conflicts
 if [ -d "./venv" ]; then
