@@ -60,14 +60,11 @@ class PacketDecoderTest(unittest.TestCase):
         struct.pack_into('<I', plaintext, 0x00, gt7communication.PACKET_MAGIC)
         struct.pack_into('<I', plaintext, 0x70, 42)
         struct.pack_into('<fffff', plaintext, 0x128, 1.25, 2.5, -3.75, 4.0, 5.5)
-        plaintext[0x13C:0x13E] = bytes((128, 64))
-        struct.pack_into('<ffff', plaintext, 0x140, 1.0, -2.0, 3.0, -4.0)
-        struct.pack_into('<f', plaintext, 0x150, 0.75)
-        plaintext[0x158:0x15C] = b'TCGS'
-        struct.pack_into('<I', plaintext, 0x15C, 91234)
-        struct.pack_into('<ff', plaintext, 0x160, -0.25, 0.5)
-        struct.pack_into('<f', plaintext, 0x168, 2.65)
-        plaintext[0x16C:0x170] = b'GR3\0'
+        plaintext[0x13C:0x140] = b'TCGS'
+        struct.pack_into('<I', plaintext, 0x140, 91234)
+        struct.pack_into('<ff', plaintext, 0x144, -0.25, 0.5)
+        struct.pack_into('<f', plaintext, 0x14C, 2.65)
+        plaintext[0x150:0x154] = b'GR3\0'
 
         decoded = gt7communication.salsa20_dec(encrypt_packet(plaintext, xor_key))
         data = gt7communication.GTData(decoded)
@@ -84,10 +81,8 @@ class PacketDecoderTest(unittest.TestCase):
         self.assertAlmostEqual(-3.75, data.sway_acceleration)
         self.assertAlmostEqual(4.0, data.heave_acceleration)
         self.assertAlmostEqual(5.5, data.surge_acceleration)
-        self.assertAlmostEqual(128 / 2.55, data.throttle_filtered_percent)
-        self.assertAlmostEqual(64 / 2.55, data.brake_filtered_percent)
-        self.assertEqual((1.0, -2.0, 3.0, -4.0), data.torque_vectors)
-        self.assertAlmostEqual(0.75, data.energy_recovery)
+        self.assertIsNone(data.throttle_filtered_percent)
+        self.assertIsNone(data.torque_vectors)
 
     def test_decodes_packet_b_fields(self):
         packet_size, xor_key = gt7communication.PACKET_FORMATS['B']
@@ -126,6 +121,7 @@ class PacketDecoderTest(unittest.TestCase):
         self.assertAlmostEqual(64 / 2.55, data.brake_filtered_percent)
         self.assertEqual((1.0, -2.0, 3.0, -4.0), data.torque_vectors)
         self.assertAlmostEqual(0.75, data.energy_recovery)
+        self.assertAlmostEqual(0.0, data.wheel_rotation_rad)
         self.assertIsNone(data.surface_type)
 
     def test_a_packet_keeps_c_fields_empty(self):

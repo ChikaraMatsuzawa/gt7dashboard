@@ -80,7 +80,7 @@ The commands `pip3` or `python3` may be different on your OS. Try `pip` or `pyth
    - The default `A` format (296 bytes) is compatible with all supported GT7 versions.
    - `B` (316 bytes) adds steering wheel rotation and angular velocity plus sway, heave, and surge acceleration. It is unavailable in Sport Mode.
    - `~` (344 bytes) includes B and adds filtered throttle/brake, per-wheel torque vectors, and energy recovery. It is unavailable in replays.
-   - GT7 v1.68 or newer can use `GT7_PACKET_FORMAT=C` (368 bytes). It includes A/B/`~` plus per-wheel surface type, live lap time, front-wheel steering angles, wheelbase, and car category.
+   - GT7 v1.68 or newer can use `GT7_PACKET_FORMAT=C` (368 bytes). It includes A/B plus per-wheel surface type, live lap time, front-wheel steering angles, wheelbase, and car category. C and `~` are separate B extensions.
 
 ## Troubleshooting
 

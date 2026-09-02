@@ -164,7 +164,7 @@ class GTData:
         self.is_paused = bin(struct.unpack('B', ddata[0x8E:0x8E + 1])[0])[-2] == '1'
         self.in_race = bin(struct.unpack('B', ddata[0x8E:0x8E + 1])[0])[-1] == '1'
 
-        # B extends A; both ~ and C include these motion values.
+        # B extends A; both ~ and C independently extend B.
         if len(ddata) >= PACKET_FORMATS["B"][0]:
             self.wheel_rotation_rad = struct.unpack('<f', ddata[0x128:0x12C])[0]
             self.steering_angular_velocity_rad_s = struct.unpack(
@@ -174,26 +174,26 @@ class GTData:
             self.heave_acceleration = struct.unpack('<f', ddata[0x134:0x138])[0]
             self.surge_acceleration = struct.unpack('<f', ddata[0x138:0x13C])[0]
 
-        # ~ extends B; C includes these filtered-input and energy values too.
-        if len(ddata) >= PACKET_FORMATS["~"][0]:
+        # ~ extends B with filtered-input and energy values.
+        if self.packet_format == "~":
             self.throttle_filtered_percent = ddata[0x13C] / 2.55
             self.brake_filtered_percent = ddata[0x13D] / 2.55
             self.torque_vectors = struct.unpack('<ffff', ddata[0x140:0x150])
             self.energy_recovery = struct.unpack('<f', ddata[0x150:0x154])[0]
 
-        # C extends ~ with surface, live lap, steering, and car metadata.
-        if len(ddata) >= PACKET_FORMATS["C"][0]:
+        # C extends B with surface, live lap, steering, and car metadata.
+        if self.packet_format == "C":
             self.surface_type = tuple(
-                ddata[0x158:0x15C].decode("ascii", errors="replace")
+                ddata[0x13C:0x140].decode("ascii", errors="replace")
             )
             self.current_lap_time_ms = struct.unpack(
-                '<I', ddata[0x15C:0x160]
+                '<I', ddata[0x140:0x144]
             )[0]
             self.front_wheel_steering_angle_rad = struct.unpack(
-                '<ff', ddata[0x160:0x168]
+                '<ff', ddata[0x144:0x14C]
             )
-            self.wheel_base_m = struct.unpack('<f', ddata[0x168:0x16C])[0]
-            self.car_category = ddata[0x16C:0x170].split(b'\0', 1)[0].decode(
+            self.wheel_base_m = struct.unpack('<f', ddata[0x14C:0x150])[0]
+            self.car_category = ddata[0x150:0x154].split(b'\0', 1)[0].decode(
                 "ascii", errors="replace"
             )
 
