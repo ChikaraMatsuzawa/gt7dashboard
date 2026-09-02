@@ -17,10 +17,41 @@ from gt7dashboard.gt7helper import seconds_to_lap_time
 from gt7dashboard.gt7lap import Lap
 
 
+PACKET_MAGIC = 0x47375330
+PACKET_FORMATS = {
+    "A": (0x128, 0xDEADBEAF),
+    "B": (0x13C, 0xDEADBEEF),
+    "~": (0x158, 0x55FABB4F),
+    "C": (0x170, 0xDEADBEEF),
+}
+PACKET_FORMATS_BY_SIZE = {
+    packet_size: (packet_format, xor_key)
+    for packet_format, (packet_size, xor_key) in PACKET_FORMATS.items()
+}
+
+
+def normalise_packet_format(packet_format: str) -> str:
+    packet_format = packet_format.strip().upper()
+    if packet_format not in PACKET_FORMATS:
+        supported_formats = ", ".join(PACKET_FORMATS)
+        raise ValueError(
+            f"Unsupported GT7 packet format '{packet_format}'. "
+            f"Supported formats: {supported_formats}"
+        )
+    return packet_format
+
+
 class GTData:
     def __init__(self, ddata):
         if not ddata:
             return
+
+        self.packet_format = PACKET_FORMATS_BY_SIZE[len(ddata)][0]
+        self.surface_type = None
+        self.current_lap_time_ms = None
+        self.front_wheel_steering_angle_rad = None
+        self.wheel_base_m = None
+        self.car_category = None
 
         self.package_id = struct.unpack('i', ddata[0x70:0x70 + 4])[0]
         self.best_lap = struct.unpack('i', ddata[0x78:0x78 + 4])[0]
@@ -124,6 +155,21 @@ class GTData:
         self.is_paused = bin(struct.unpack('B', ddata[0x8E:0x8E + 1])[0])[-2] == '1'
         self.in_race = bin(struct.unpack('B', ddata[0x8E:0x8E + 1])[0])[-1] == '1'
 
+        if self.packet_format == "C":
+            self.surface_type = tuple(
+                ddata[0x158:0x15C].decode("ascii", errors="replace")
+            )
+            self.current_lap_time_ms = struct.unpack(
+                '<I', ddata[0x15C:0x160]
+            )[0]
+            self.front_wheel_steering_angle_rad = struct.unpack(
+                '<ff', ddata[0x160:0x168]
+            )
+            self.wheel_base_m = struct.unpack('<f', ddata[0x168:0x16C])[0]
+            self.car_category = ddata[0x16C:0x170].split(b'\0', 1)[0].decode(
+                "ascii", errors="replace"
+            )
+
         # struct.unpack('f', ddata[0x28:0x28+4])[0]					# rot ???
 
         # bin(struct.unpack('B', ddata[0x8E:0x8E+1])[0])[2:]	# various flags (see https://github.com/Nenkai/PDTools/blob/master/PDTools.SimulatorInterface/SimulatorPacketG7S0.cs)
@@ -160,7 +206,7 @@ class Session():
         return other is not None and self.best_lap == other.best_lap and self.min_body_height == other.min_body_height and self.max_speed == other.max_speed
 
 class GT7Communication(Thread):
-    def __init__(self, playstation_ip):
+    def __init__(self, playstation_ip, packet_format="A"):
         # Thread control
         Thread.__init__(self)
         self._shall_run = True
@@ -172,6 +218,8 @@ class GT7Communication(Thread):
         self.lap_callback_function = None
 
         self.playstation_ip = playstation_ip
+        self.packet_format = normalise_packet_format(packet_format)
+        self.last_packet_format = None
         self.send_port = 33739
         self.receive_port = 33740
         self._last_time_data_received = 0
@@ -209,7 +257,11 @@ class GT7Communication(Thread):
                         data, address = s.recvfrom(4096)
                         package_nr = package_nr + 1
                         ddata = salsa20_dec(data)
-                        if len(ddata) > 0 and struct.unpack('i', ddata[0x70:0x70 + 4])[0] > package_id:
+                        if ddata is None:
+                            continue
+
+                        self.last_packet_format = PACKET_FORMATS_BY_SIZE[len(data)][0]
+                        if struct.unpack('i', ddata[0x70:0x70 + 4])[0] > package_id:
 
                             self.last_data = GTData(ddata)
                             self._last_time_data_received = time.time()
@@ -266,7 +318,7 @@ class GT7Communication(Thread):
         return self._last_time_data_received > 0 and (time.time() - self._last_time_data_received) <= 1
 
     def _send_hb(self, s):
-        send_data = 'A'
+        send_data = self.packet_format
         s.sendto(send_data.encode('utf-8'), (self.playstation_ip, self.send_port))
 
     def get_last_data(self) -> GTData:
@@ -437,20 +489,25 @@ class GT7Communication(Thread):
         self.lap_callback_function = new_lap_callback
 
 
-# data stream decoding
+# Data stream decoding. The UDP datagram length identifies the requested
+# telemetry format and therefore its Salsa20 nonce XOR value.
 def salsa20_dec(dat):
+    packet_spec = PACKET_FORMATS_BY_SIZE.get(len(dat))
+    if packet_spec is None:
+        return None
+
+    _, xor_key = packet_spec
     key = b'Simulator Interface Packet GT7 ver 0.0'
     # Seed IV is always located here
     oiv = dat[0x40:0x44]
     iv1 = int.from_bytes(oiv, byteorder='little')
-    # Notice DEADBEAF, not DEADBEEF
-    iv2 = iv1 ^ 0xDEADBEAF
+    iv2 = iv1 ^ xor_key
     iv = bytearray()
     iv.extend(iv2.to_bytes(4, 'little'))
     iv.extend(iv1.to_bytes(4, 'little'))
     cipher = Salsa20.new(key[0:32], bytes(iv))
     ddata = cipher.decrypt(dat)
     magic = int.from_bytes(ddata[0:4], byteorder='little')
-    if magic != 0x47375330:
-        return bytearray(b'')
+    if magic != PACKET_MAGIC:
+        return None
     return ddata

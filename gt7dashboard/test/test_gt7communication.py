@@ -1,11 +1,97 @@
 import os
+import struct
 import time
 import unittest
+
+from Crypto.Cipher import Salsa20
 
 from gt7dashboard import gt7communication
 from gt7dashboard.gt7lap import Lap
 
 PLAYSTATION_IP = "ps5wifi"
+
+
+class RecordingSocket:
+    def __init__(self):
+        self.sent = []
+
+    def sendto(self, data, address):
+        self.sent.append((data, address))
+
+
+def encrypt_packet(plaintext, xor_key, iv1=0x12345678):
+    """Create a GT7-compatible encrypted packet for decoder tests."""
+    nonce = struct.pack('<II', iv1 ^ xor_key, iv1)
+    cipher = Salsa20.new(b'Simulator Interface Packet GT7 ver 0.0'[:32], nonce)
+    encrypted = bytearray(cipher.encrypt(plaintext))
+    # GT7 exposes this nonce seed in the UDP packet so that clients can decrypt it.
+    encrypted[0x40:0x44] = struct.pack('<I', iv1)
+    return bytes(encrypted)
+
+
+def packet_for_format(packet_format, magic=gt7communication.PACKET_MAGIC):
+    packet_size, xor_key = gt7communication.PACKET_FORMATS[packet_format]
+    plaintext = bytearray(packet_size)
+    struct.pack_into('<I', plaintext, 0x00, magic)
+    struct.pack_into('<I', plaintext, 0x70, 42)
+    return encrypt_packet(plaintext, xor_key)
+
+
+class PacketDecoderTest(unittest.TestCase):
+    def test_decodes_each_known_packet_format(self):
+        for packet_format in gt7communication.PACKET_FORMATS:
+            with self.subTest(packet_format=packet_format):
+                decoded = gt7communication.salsa20_dec(packet_for_format(packet_format))
+                self.assertIsNotNone(decoded)
+                self.assertEqual(gt7communication.PACKET_MAGIC,
+                                 struct.unpack('<I', decoded[0:4])[0])
+                self.assertEqual(
+                    packet_format,
+                    gt7communication.PACKET_FORMATS_BY_SIZE[len(decoded)][0],
+                )
+
+    def test_rejects_unknown_size_and_invalid_magic(self):
+        self.assertIsNone(gt7communication.salsa20_dec(b'not a GT7 packet'))
+        self.assertIsNone(gt7communication.salsa20_dec(packet_for_format('C', 0)))
+
+    def test_decodes_packet_c_fields(self):
+        packet_size, xor_key = gt7communication.PACKET_FORMATS['C']
+        plaintext = bytearray(packet_size)
+        struct.pack_into('<I', plaintext, 0x00, gt7communication.PACKET_MAGIC)
+        struct.pack_into('<I', plaintext, 0x70, 42)
+        plaintext[0x158:0x15C] = b'TCGS'
+        struct.pack_into('<I', plaintext, 0x15C, 91234)
+        struct.pack_into('<ff', plaintext, 0x160, -0.25, 0.5)
+        struct.pack_into('<f', plaintext, 0x168, 2.65)
+        plaintext[0x16C:0x170] = b'GR3\0'
+
+        decoded = gt7communication.salsa20_dec(encrypt_packet(plaintext, xor_key))
+        data = gt7communication.GTData(decoded)
+
+        self.assertEqual('C', data.packet_format)
+        self.assertEqual(('T', 'C', 'G', 'S'), data.surface_type)
+        self.assertEqual(91234, data.current_lap_time_ms)
+        self.assertAlmostEqual(-0.25, data.front_wheel_steering_angle_rad[0])
+        self.assertAlmostEqual(0.5, data.front_wheel_steering_angle_rad[1])
+        self.assertAlmostEqual(2.65, data.wheel_base_m, places=6)
+        self.assertEqual('GR3', data.car_category)
+
+    def test_a_packet_keeps_c_fields_empty(self):
+        data = gt7communication.GTData(gt7communication.salsa20_dec(packet_for_format('A')))
+        self.assertEqual('A', data.packet_format)
+        self.assertIsNone(data.surface_type)
+        self.assertIsNone(data.current_lap_time_ms)
+
+    def test_packet_format_selects_heartbeat(self):
+        socket = RecordingSocket()
+        communication = gt7communication.GT7Communication('192.0.2.1', 'C')
+        communication._send_hb(socket)
+        self.assertEqual([(b'C', ('192.0.2.1', 33739))], socket.sent)
+
+    def test_packet_format_validation(self):
+        self.assertEqual('C', gt7communication.normalise_packet_format(' c '))
+        with self.assertRaises(ValueError):
+            gt7communication.GT7Communication('192.0.2.1', 'D')
 
 
 # check if host is up

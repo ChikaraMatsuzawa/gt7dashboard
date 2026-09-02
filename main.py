@@ -329,13 +329,16 @@ app = bokeh.application.Application
 # Share the gt7comm connection between sessions by storing them as an application attribute
 if not hasattr(app, "gt7comm"):
     playstation_ip = os.environ.get("GT7_PLAYSTATION_IP")
+    packet_format = os.environ.get("GT7_PACKET_FORMAT", "A")
     load_laps_path = os.environ.get("GT7_LOAD_LAPS_PATH")
 
     if not playstation_ip:
         playstation_ip = "255.255.255.255"
         logger.info(f"No IP set in env var GT7_PLAYSTATION_IP using broadcast at {playstation_ip}")
 
-    app.gt7comm = gt7communication.GT7Communication(playstation_ip)
+    app.gt7comm = gt7communication.GT7Communication(
+        playstation_ip, packet_format=packet_format
+    )
 
     if load_laps_path:
         app.gt7comm.load_laps(
