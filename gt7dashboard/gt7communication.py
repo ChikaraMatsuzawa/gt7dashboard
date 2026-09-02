@@ -181,6 +181,7 @@ class GTData:
             self.torque_vectors = struct.unpack('<ffff', ddata[0x140:0x150])
             self.energy_recovery = struct.unpack('<f', ddata[0x150:0x154])[0]
 
+        # C extends ~ with surface, live lap, steering, and car metadata.
         if len(ddata) >= PACKET_FORMATS["C"][0]:
             self.surface_type = tuple(
                 ddata[0x158:0x15C].decode("ascii", errors="replace")
