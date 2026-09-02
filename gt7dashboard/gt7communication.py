@@ -47,6 +47,15 @@ class GTData:
             return
 
         self.packet_format = PACKET_FORMATS_BY_SIZE[len(ddata)][0]
+        self.wheel_rotation_rad = None
+        self.steering_angular_velocity_rad_s = None
+        self.sway_acceleration = None
+        self.heave_acceleration = None
+        self.surge_acceleration = None
+        self.throttle_filtered_percent = None
+        self.brake_filtered_percent = None
+        self.torque_vectors = None
+        self.energy_recovery = None
         self.surface_type = None
         self.current_lap_time_ms = None
         self.front_wheel_steering_angle_rad = None
@@ -155,7 +164,24 @@ class GTData:
         self.is_paused = bin(struct.unpack('B', ddata[0x8E:0x8E + 1])[0])[-2] == '1'
         self.in_race = bin(struct.unpack('B', ddata[0x8E:0x8E + 1])[0])[-1] == '1'
 
-        if self.packet_format == "C":
+        # B extends A; both ~ and C include these motion values.
+        if len(ddata) >= PACKET_FORMATS["B"][0]:
+            self.wheel_rotation_rad = struct.unpack('<f', ddata[0x128:0x12C])[0]
+            self.steering_angular_velocity_rad_s = struct.unpack(
+                '<f', ddata[0x12C:0x130]
+            )[0]
+            self.sway_acceleration = struct.unpack('<f', ddata[0x130:0x134])[0]
+            self.heave_acceleration = struct.unpack('<f', ddata[0x134:0x138])[0]
+            self.surge_acceleration = struct.unpack('<f', ddata[0x138:0x13C])[0]
+
+        # ~ extends B; C includes these filtered-input and energy values too.
+        if len(ddata) >= PACKET_FORMATS["~"][0]:
+            self.throttle_filtered_percent = ddata[0x13C] / 2.55
+            self.brake_filtered_percent = ddata[0x13D] / 2.55
+            self.torque_vectors = struct.unpack('<ffff', ddata[0x140:0x150])
+            self.energy_recovery = struct.unpack('<f', ddata[0x150:0x154])[0]
+
+        if len(ddata) >= PACKET_FORMATS["C"][0]:
             self.surface_type = tuple(
                 ddata[0x158:0x15C].decode("ascii", errors="replace")
             )

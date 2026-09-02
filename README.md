@@ -78,8 +78,9 @@ The commands `pip3` or `python3` may be different on your OS. Try `pip` or `pyth
    - (Windows) `set GT7_PLAYSTATION_IP=<CONSOLE IP ADDRESS>` and `python -m bokeh serve .`  (when inside the `gt7dashboard` folder)
 5. (Optional) Select the telemetry packet format with `GT7_PACKET_FORMAT`.
    - The default `A` format (296 bytes) is compatible with all supported GT7 versions.
-   - GT7 v1.68 or newer can use `GT7_PACKET_FORMAT=C` (368 bytes) to include per-wheel surface type, live lap time, front-wheel steering angles, wheelbase, and car category.
-   - The extended `B` and `~` formats can also be selected. `B` is unavailable in Sport Mode and `~` is unavailable in replays.
+   - `B` (316 bytes) adds steering wheel rotation and angular velocity plus sway, heave, and surge acceleration. It is unavailable in Sport Mode.
+   - `~` (344 bytes) includes B and adds filtered throttle/brake, per-wheel torque vectors, and energy recovery. It is unavailable in replays.
+   - GT7 v1.68 or newer can use `GT7_PACKET_FORMAT=C` (368 bytes). It includes A/B/`~` plus per-wheel surface type, live lap time, front-wheel steering angles, wheelbase, and car category.
 
 ## Troubleshooting
 

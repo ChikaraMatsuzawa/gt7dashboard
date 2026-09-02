@@ -59,6 +59,10 @@ class PacketDecoderTest(unittest.TestCase):
         plaintext = bytearray(packet_size)
         struct.pack_into('<I', plaintext, 0x00, gt7communication.PACKET_MAGIC)
         struct.pack_into('<I', plaintext, 0x70, 42)
+        struct.pack_into('<fffff', plaintext, 0x128, 1.25, 2.5, -3.75, 4.0, 5.5)
+        plaintext[0x13C:0x13E] = bytes((128, 64))
+        struct.pack_into('<ffff', plaintext, 0x140, 1.0, -2.0, 3.0, -4.0)
+        struct.pack_into('<f', plaintext, 0x150, 0.75)
         plaintext[0x158:0x15C] = b'TCGS'
         struct.pack_into('<I', plaintext, 0x15C, 91234)
         struct.pack_into('<ff', plaintext, 0x160, -0.25, 0.5)
@@ -75,10 +79,60 @@ class PacketDecoderTest(unittest.TestCase):
         self.assertAlmostEqual(0.5, data.front_wheel_steering_angle_rad[1])
         self.assertAlmostEqual(2.65, data.wheel_base_m, places=6)
         self.assertEqual('GR3', data.car_category)
+        self.assertAlmostEqual(1.25, data.wheel_rotation_rad)
+        self.assertAlmostEqual(2.5, data.steering_angular_velocity_rad_s)
+        self.assertAlmostEqual(-3.75, data.sway_acceleration)
+        self.assertAlmostEqual(4.0, data.heave_acceleration)
+        self.assertAlmostEqual(5.5, data.surge_acceleration)
+        self.assertAlmostEqual(128 / 2.55, data.throttle_filtered_percent)
+        self.assertAlmostEqual(64 / 2.55, data.brake_filtered_percent)
+        self.assertEqual((1.0, -2.0, 3.0, -4.0), data.torque_vectors)
+        self.assertAlmostEqual(0.75, data.energy_recovery)
+
+    def test_decodes_packet_b_fields(self):
+        packet_size, xor_key = gt7communication.PACKET_FORMATS['B']
+        plaintext = bytearray(packet_size)
+        struct.pack_into('<I', plaintext, 0x00, gt7communication.PACKET_MAGIC)
+        struct.pack_into('<I', plaintext, 0x70, 42)
+        struct.pack_into('<fffff', plaintext, 0x128, 1.25, 2.5, -3.75, 4.0, 5.5)
+
+        data = gt7communication.GTData(
+            gt7communication.salsa20_dec(encrypt_packet(plaintext, xor_key))
+        )
+
+        self.assertEqual('B', data.packet_format)
+        self.assertAlmostEqual(1.25, data.wheel_rotation_rad)
+        self.assertAlmostEqual(2.5, data.steering_angular_velocity_rad_s)
+        self.assertAlmostEqual(-3.75, data.sway_acceleration)
+        self.assertAlmostEqual(4.0, data.heave_acceleration)
+        self.assertAlmostEqual(5.5, data.surge_acceleration)
+        self.assertIsNone(data.throttle_filtered_percent)
+
+    def test_decodes_packet_tilde_fields(self):
+        packet_size, xor_key = gt7communication.PACKET_FORMATS['~']
+        plaintext = bytearray(packet_size)
+        struct.pack_into('<I', plaintext, 0x00, gt7communication.PACKET_MAGIC)
+        struct.pack_into('<I', plaintext, 0x70, 42)
+        plaintext[0x13C:0x13E] = bytes((128, 64))
+        struct.pack_into('<ffff', plaintext, 0x140, 1.0, -2.0, 3.0, -4.0)
+        struct.pack_into('<f', plaintext, 0x150, 0.75)
+
+        data = gt7communication.GTData(
+            gt7communication.salsa20_dec(encrypt_packet(plaintext, xor_key))
+        )
+
+        self.assertEqual('~', data.packet_format)
+        self.assertAlmostEqual(128 / 2.55, data.throttle_filtered_percent)
+        self.assertAlmostEqual(64 / 2.55, data.brake_filtered_percent)
+        self.assertEqual((1.0, -2.0, 3.0, -4.0), data.torque_vectors)
+        self.assertAlmostEqual(0.75, data.energy_recovery)
+        self.assertIsNone(data.surface_type)
 
     def test_a_packet_keeps_c_fields_empty(self):
         data = gt7communication.GTData(gt7communication.salsa20_dec(packet_for_format('A')))
         self.assertEqual('A', data.packet_format)
+        self.assertIsNone(data.wheel_rotation_rad)
+        self.assertIsNone(data.throttle_filtered_percent)
         self.assertIsNone(data.surface_type)
         self.assertIsNone(data.current_lap_time_ms)
 
