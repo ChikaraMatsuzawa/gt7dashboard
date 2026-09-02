@@ -45,6 +45,37 @@ class Lap:
         # Yaw Rate
         self.data_rotation_yaw = []
         self.data_absolute_yaw_rate_per_second = []
+
+        # Packet B motion telemetry (one value per recorded packet)
+        self.data_wheel_rotation_rad = []
+        self.data_steering_angular_velocity_rad_s = []
+        self.data_sway_acceleration = []
+        self.data_heave_acceleration = []
+        self.data_surge_acceleration = []
+
+        # Packet ~ filtered-input and torque telemetry (one value per packet)
+        self.data_throttle_filtered_percent = []
+        self.data_brake_filtered_percent = []
+        self.data_torque_vector_fl = []
+        self.data_torque_vector_fr = []
+        self.data_torque_vector_rl = []
+        self.data_torque_vector_rr = []
+        self.data_energy_recovery = []
+
+        # Packet C telemetry (one value per recorded packet)
+        self.data_surface_type_fl = []
+        self.data_surface_type_fr = []
+        self.data_surface_type_rl = []
+        self.data_surface_type_rr = []
+        self.data_current_lap_time_ms = []
+        self.data_front_left_steering_angle_rad = []
+        self.data_front_right_steering_angle_rad = []
+
+        # Packet C car metadata and the format used to record this lap
+        self.wheel_base_m = None
+        self.car_category = None
+        self.telemetry_packet_format = None
+
         # Car
         self.car_id = 0
 

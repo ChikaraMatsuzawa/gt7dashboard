@@ -212,6 +212,30 @@ class TestLaps(unittest.TestCase):
         self.assertListEqual(brake_points_x, [2, 18])
         self.assertListEqual(brake_points_y, [1, 8])
 
+    def test_get_median_lap_skips_packet_c_metadata(self):
+        lap_1 = Lap()
+        lap_1.lap_finish_time = 60000
+        lap_1.data_speed = [100]
+        lap_1.data_surface_type_fl = ["T"]
+        lap_1.wheel_base_m = 2.5
+        lap_1.car_category = "GR3"
+        lap_1.telemetry_packet_format = "C"
+
+        lap_2 = Lap()
+        lap_2.lap_finish_time = 61000
+        lap_2.data_speed = [110]
+        lap_2.data_surface_type_fl = ["C"]
+        lap_2.wheel_base_m = 2.6
+        lap_2.car_category = "GR4"
+        lap_2.telemetry_packet_format = "C"
+
+        median_lap = gt7helper.get_median_lap([lap_1, lap_2])
+
+        self.assertEqual([], median_lap.data_surface_type_fl)
+        self.assertIsNone(median_lap.wheel_base_m)
+        self.assertIsNone(median_lap.car_category)
+        self.assertIsNone(median_lap.telemetry_packet_format)
+
     def test_get_median_lap(self):
         median_lap = gt7helper.get_median_lap(self.Laps)
         self.assertEqual(len(median_lap.data_throttle), len(self.Laps[0].data_throttle))
@@ -359,6 +383,13 @@ class TestLaps(unittest.TestCase):
     def test_save_laps_to_json(self):
         l1 = Lap()
         l1.data_boost = [0.6, 0.7, 0.9]
+        l1.data_torque_vector_fl = [1.0, 1.1, 1.2]
+        l1.data_torque_vector_fr = [2.0, 2.1, 2.2]
+        l1.data_surface_type_fl = ["T", "C", "G"]
+        l1.data_front_left_steering_angle_rad = [-0.1, 0.0, 0.1]
+        l1.wheel_base_m = 2.65
+        l1.car_category = "GR3"
+        l1.telemetry_packet_format = "C"
         l2 = Lap()
         l2.data_boost = [2.6, 2.7, 3.9]
 

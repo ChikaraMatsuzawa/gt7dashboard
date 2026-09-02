@@ -429,10 +429,20 @@ def get_median_lap(laps: List[Lap]) -> Lap:
     if len(laps) == 0:
         return median_lap
 
+    non_median_extension_attributes = {
+        "data_surface_type_fl",
+        "data_surface_type_fr",
+        "data_surface_type_rl",
+        "data_surface_type_rr",
+        "wheel_base_m",
+        "car_category",
+        "telemetry_packet_format",
+    }
+
     for val in vars(laps[0]):
         attributes = []
         for lap in laps:
-            if val == "options":
+            if val == "options" or val in non_median_extension_attributes:
                 continue
             attr = getattr(lap, val)
             # FIXME why is it sometimes string AND int?

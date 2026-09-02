@@ -450,6 +450,58 @@ class GT7Communication(Thread):
 
         self.current_lap.data_absolute_yaw_rate_per_second.append(abs(yaw_rate_per_second))
 
+        # Record extension fields as individual time series so they remain JSON
+        # primitives and share the same sample index as the existing lap data.
+        self.current_lap.telemetry_packet_format = data.packet_format
+
+        if data.wheel_rotation_rad is not None:
+            self.current_lap.data_wheel_rotation_rad.append(data.wheel_rotation_rad)
+            self.current_lap.data_steering_angular_velocity_rad_s.append(
+                data.steering_angular_velocity_rad_s
+            )
+            self.current_lap.data_sway_acceleration.append(data.sway_acceleration)
+            self.current_lap.data_heave_acceleration.append(data.heave_acceleration)
+            self.current_lap.data_surge_acceleration.append(data.surge_acceleration)
+
+        if data.throttle_filtered_percent is not None:
+            self.current_lap.data_throttle_filtered_percent.append(
+                data.throttle_filtered_percent
+            )
+            self.current_lap.data_brake_filtered_percent.append(
+                data.brake_filtered_percent
+            )
+            (
+                torque_vector_fl,
+                torque_vector_fr,
+                torque_vector_rl,
+                torque_vector_rr,
+            ) = data.torque_vectors
+            self.current_lap.data_torque_vector_fl.append(torque_vector_fl)
+            self.current_lap.data_torque_vector_fr.append(torque_vector_fr)
+            self.current_lap.data_torque_vector_rl.append(torque_vector_rl)
+            self.current_lap.data_torque_vector_rr.append(torque_vector_rr)
+            self.current_lap.data_energy_recovery.append(data.energy_recovery)
+
+        if data.surface_type is not None:
+            surface_type_fl, surface_type_fr, surface_type_rl, surface_type_rr = data.surface_type
+            self.current_lap.data_surface_type_fl.append(surface_type_fl)
+            self.current_lap.data_surface_type_fr.append(surface_type_fr)
+            self.current_lap.data_surface_type_rl.append(surface_type_rl)
+            self.current_lap.data_surface_type_rr.append(surface_type_rr)
+            self.current_lap.data_current_lap_time_ms.append(data.current_lap_time_ms)
+            (
+                front_left_steering_angle_rad,
+                front_right_steering_angle_rad,
+            ) = data.front_wheel_steering_angle_rad
+            self.current_lap.data_front_left_steering_angle_rad.append(
+                front_left_steering_angle_rad
+            )
+            self.current_lap.data_front_right_steering_angle_rad.append(
+                front_right_steering_angle_rad
+            )
+            self.current_lap.wheel_base_m = data.wheel_base_m
+            self.current_lap.car_category = data.car_category
+
         # Adapted from https://www.gtplanet.net/forum/threads/gt7-is-compatible-with-motion-rig.410728/post-13810797
         self.current_lap.lap_live_time = (self.current_lap.lap_ticks * 1. / 60.) - (self.session.special_packet_time / 1000.)
 

@@ -38,6 +38,33 @@ def packet_for_format(packet_format, magic=gt7communication.PACKET_MAGIC):
 
 
 class PacketDecoderTest(unittest.TestCase):
+    def record_extension_packet(self, packet_format):
+        packet_size, xor_key = gt7communication.PACKET_FORMATS[packet_format]
+        plaintext = bytearray(packet_size)
+        struct.pack_into('<I', plaintext, 0x00, gt7communication.PACKET_MAGIC)
+        struct.pack_into('<I', plaintext, 0x70, 42)
+        struct.pack_into('<fffff', plaintext, 0x128, 1.25, 2.5, -3.75, 4.0, 5.5)
+
+        if packet_format in ('~', 'C'):
+            plaintext[0x13C:0x13E] = bytes((128, 64))
+            struct.pack_into('<ffff', plaintext, 0x140, 1.0, -2.0, 3.0, -4.0)
+            struct.pack_into('<f', plaintext, 0x150, 0.75)
+
+        if packet_format == 'C':
+            plaintext[0x158:0x15C] = b'TCGS'
+            struct.pack_into('<I', plaintext, 0x15C, 91234)
+            struct.pack_into('<ff', plaintext, 0x160, -0.25, 0.5)
+            struct.pack_into('<f', plaintext, 0x168, 2.65)
+            plaintext[0x16C:0x170] = b'GR3\0'
+
+        data = gt7communication.GTData(
+            gt7communication.salsa20_dec(encrypt_packet(plaintext, xor_key))
+        )
+        data.in_race = True
+        communication = gt7communication.GT7Communication('192.0.2.1')
+        communication._log_data(data)
+        return communication.current_lap
+
     def test_decodes_each_known_packet_format(self):
         for packet_format in gt7communication.PACKET_FORMATS:
             with self.subTest(packet_format=packet_format):
@@ -135,6 +162,49 @@ class PacketDecoderTest(unittest.TestCase):
         self.assertIsNone(data.throttle_filtered_percent)
         self.assertIsNone(data.surface_type)
         self.assertIsNone(data.current_lap_time_ms)
+
+    def test_records_packet_b_extension_fields_in_lap(self):
+        lap = self.record_extension_packet('B')
+
+        self.assertEqual('B', lap.telemetry_packet_format)
+        self.assertEqual([1.25], lap.data_wheel_rotation_rad)
+        self.assertEqual([2.5], lap.data_steering_angular_velocity_rad_s)
+        self.assertEqual([-3.75], lap.data_sway_acceleration)
+        self.assertEqual([4.0], lap.data_heave_acceleration)
+        self.assertEqual([5.5], lap.data_surge_acceleration)
+        self.assertEqual([], lap.data_throttle_filtered_percent)
+        self.assertEqual([], lap.data_surface_type_fl)
+
+    def test_records_packet_tilde_extension_fields_in_lap(self):
+        lap = self.record_extension_packet('~')
+
+        self.assertEqual('~', lap.telemetry_packet_format)
+        self.assertEqual([1.25], lap.data_wheel_rotation_rad)
+        self.assertEqual([128 / 2.55], lap.data_throttle_filtered_percent)
+        self.assertEqual([64 / 2.55], lap.data_brake_filtered_percent)
+        self.assertEqual([1.0], lap.data_torque_vector_fl)
+        self.assertEqual([-2.0], lap.data_torque_vector_fr)
+        self.assertEqual([3.0], lap.data_torque_vector_rl)
+        self.assertEqual([-4.0], lap.data_torque_vector_rr)
+        self.assertEqual([0.75], lap.data_energy_recovery)
+        self.assertEqual([], lap.data_surface_type_fl)
+
+    def test_records_packet_c_extension_fields_in_lap(self):
+        lap = self.record_extension_packet('C')
+
+        self.assertEqual('C', lap.telemetry_packet_format)
+        self.assertEqual([1.25], lap.data_wheel_rotation_rad)
+        self.assertEqual([128 / 2.55], lap.data_throttle_filtered_percent)
+        self.assertEqual([1.0], lap.data_torque_vector_fl)
+        self.assertEqual(['T'], lap.data_surface_type_fl)
+        self.assertEqual(['C'], lap.data_surface_type_fr)
+        self.assertEqual(['G'], lap.data_surface_type_rl)
+        self.assertEqual(['S'], lap.data_surface_type_rr)
+        self.assertEqual([91234], lap.data_current_lap_time_ms)
+        self.assertEqual([-0.25], lap.data_front_left_steering_angle_rad)
+        self.assertEqual([0.5], lap.data_front_right_steering_angle_rad)
+        self.assertAlmostEqual(2.65, lap.wheel_base_m, places=6)
+        self.assertEqual('GR3', lap.car_category)
 
     def test_packet_format_selects_heartbeat(self):
         socket = RecordingSocket()
