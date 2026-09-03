@@ -59,7 +59,7 @@ You will have to have a running Python installation. Look [here](https://wiki.py
 
   * Run the file `run.ps1` with a double click
 * If you are on MacOS run the file `run.command`
-* If you are on MacOS and using Homebrew to manage your Python3 installation, run the file `brew.command`
+* If you are on MacOS and using Homebrew to manage your Python3 installation, run the file `brew.command`. It creates its virtual environment only on first use, after a Python-version change, or when `requirements.txt` changes. To force a fresh environment, run `GT7_REBUILD_VENV=true ./brew.command`.
 * If you are on Linux run the file `run.sh`
 
 The commands `pip3` or `python3` may be different on your OS. Try `pip` or `python` instead.

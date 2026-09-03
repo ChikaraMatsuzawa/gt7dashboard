@@ -20,15 +20,47 @@ fi
 echo "Using Python binary: $PYTHON_BIN"
 echo "Using GT7 packet format: $GT7_PACKET_FORMAT"
 
-# Remove existing virtual environment to avoid Python version conflicts
-if [ -d "./venv" ]; then
-    echo "Cleaning up existing virtual environment..."
-    rm -rf ./venv
+# Reuse the virtual environment unless the selected Python version changed.
+# Set GT7_REBUILD_VENV=true to explicitly recreate it.
+VENV_DIR="./venv"
+VENV_PYTHON="$VENV_DIR/bin/python"
+SELECTED_PYTHON_VERSION=$("$PYTHON_BIN" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+VENV_NEEDS_CREATE=false
+
+if [ "${GT7_REBUILD_VENV:-false}" = "true" ]; then
+    echo "Recreating virtual environment on request..."
+    VENV_NEEDS_CREATE=true
+elif [ ! -x "$VENV_PYTHON" ]; then
+    echo "Creating virtual environment..."
+    VENV_NEEDS_CREATE=true
+else
+    VENV_PYTHON_VERSION=$("$VENV_PYTHON" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+    if [ "$VENV_PYTHON_VERSION" != "$SELECTED_PYTHON_VERSION" ]; then
+        echo "Recreating virtual environment for Python $SELECTED_PYTHON_VERSION..."
+        VENV_NEEDS_CREATE=true
+    fi
 fi
 
-$PYTHON_BIN -m venv ./venv
-source ./venv/bin/activate
-python3 -m pip install --upgrade pip
-python3 -m pip install -r requirements.txt
-python3 helper/download_cars_csv.py
-python3 -m bokeh serve .
+if [ "$VENV_NEEDS_CREATE" = true ]; then
+    rm -rf "$VENV_DIR"
+    "$PYTHON_BIN" -m venv "$VENV_DIR"
+fi
+
+source "$VENV_DIR/bin/activate"
+
+REQUIREMENTS_STAMP="$VENV_DIR/.requirements-sha256"
+REQUIREMENTS_HASH=$(shasum -a 256 requirements.txt | awk '{print $1}')
+if [ "$VENV_NEEDS_CREATE" = true ] || [ ! -f "$REQUIREMENTS_STAMP" ] || [ "$(cat "$REQUIREMENTS_STAMP")" != "$REQUIREMENTS_HASH" ]; then
+    echo "Installing Python dependencies..."
+    python -m pip install --upgrade pip
+    python -m pip install -r requirements.txt
+    printf '%s\n' "$REQUIREMENTS_HASH" > "$REQUIREMENTS_STAMP"
+else
+    echo "Reusing existing virtual environment."
+fi
+
+if [ ! -f "db/cars.csv" ]; then
+    python helper/download_cars_csv.py
+fi
+
+python -m bokeh serve .
