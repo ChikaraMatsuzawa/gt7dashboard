@@ -59,7 +59,7 @@ You will have to have a running Python installation. Look [here](https://wiki.py
 
   * Run the file `run.ps1` with a double click
 * If you are on MacOS run the file `run.command`
-* If you are on MacOS and using Homebrew to manage your Python3 installation, run the file `brew.command`. It creates its virtual environment only on first use, after a Python-version change, or when `requirements.txt` changes. To force a fresh environment, run `GT7_REBUILD_VENV=true ./brew.command`.
+* If you are on MacOS and using Homebrew to manage your Python3 installation, run the file `brew.command`. It creates its virtual environment on first use, recreates it after a Python-version change, and updates dependencies when `requirements.txt` changes. It requests packet format C by default; run `GT7_PACKET_FORMAT=A ./brew.command` to use format A instead. To force a fresh environment, run `GT7_REBUILD_VENV=true ./brew.command`.
 * If you are on Linux run the file `run.sh`
 
 The commands `pip3` or `python3` may be different on your OS. Try `pip` or `python` instead.
@@ -77,7 +77,7 @@ The commands `pip3` or `python3` may be different on your OS. Try `pip` or `pyth
    - (Mac/Linux) `GT7_PLAYSTATION_IP=<CONSOLE IP ADDRESS> bokeh serve .` (when inside the  `gt7dashboard` folder)
    - (Windows) `set GT7_PLAYSTATION_IP=<CONSOLE IP ADDRESS>` and `python -m bokeh serve .`  (when inside the `gt7dashboard` folder)
 5. (Optional) Select the telemetry packet format with `GT7_PACKET_FORMAT`.
-   - The default `A` format (296 bytes) is compatible with all supported GT7 versions.
+   - The application default `A` format (296 bytes) is compatible with all supported GT7 versions. The Homebrew launcher defaults to C as noted above.
    - `B` (316 bytes) adds steering wheel rotation and angular velocity plus sway, heave, and surge acceleration. It is unavailable in Sport Mode.
    - `~` (344 bytes) includes B and adds filtered throttle/brake, per-wheel torque vectors, and energy recovery. It is unavailable in replays.
    - GT7 v1.68 or newer can use `GT7_PACKET_FORMAT=C` (368 bytes). It includes A/B/`~` plus per-wheel surface type, live lap time, front-wheel steering angles, wheelbase, and car category.

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # This script should be used on MacOS when Python is a managed environment;
 # i.e.: when Python is installed via Homebrew or similar package managers
 

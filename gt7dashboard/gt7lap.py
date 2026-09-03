@@ -3,6 +3,28 @@ from gt7dashboard import gt7helper
 
 
 class Lap:
+    EXTENSION_DATA_ATTRIBUTES = (
+        "data_wheel_rotation_rad",
+        "data_steering_angular_velocity_rad_s",
+        "data_sway_acceleration",
+        "data_heave_acceleration",
+        "data_surge_acceleration",
+        "data_throttle_filtered_percent",
+        "data_brake_filtered_percent",
+        "data_torque_vector_fl",
+        "data_torque_vector_fr",
+        "data_torque_vector_rl",
+        "data_torque_vector_rr",
+        "data_energy_recovery",
+        "data_surface_type_fl",
+        "data_surface_type_fr",
+        "data_surface_type_rl",
+        "data_surface_type_rr",
+        "data_current_lap_time_ms",
+        "data_front_left_steering_angle_rad",
+        "data_front_right_steering_angle_rad",
+    )
+
     def __init__(self):
         # Nice title for lap
         self.title = ""
@@ -85,6 +107,13 @@ class Lap:
 
         self.lap_start_timestamp = datetime.now()
         self.lap_end_timestamp = -1
+
+    def discard_unavailable_extension_data(self):
+        """Keep unsupported packet extensions compact in persisted lap JSON."""
+        for attribute in self.EXTENSION_DATA_ATTRIBUTES:
+            values = getattr(self, attribute)
+            if values and all(value is None for value in values):
+                setattr(self, attribute, [])
 
     def __str__(self):
         return "\n %s, %2d, %1.f, %4d, %4d, %4d" % (

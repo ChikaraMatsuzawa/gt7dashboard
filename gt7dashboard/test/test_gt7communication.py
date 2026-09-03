@@ -8,7 +8,10 @@ from Crypto.Cipher import Salsa20
 from gt7dashboard import gt7communication
 from gt7dashboard.gt7lap import Lap
 
-PLAYSTATION_IP = "ps5wifi"
+PLAYSTATION_IP = os.environ.get("GT7_PLAYSTATION_IP", "ps5wifi")
+RUN_INTEGRATION_TESTS = os.environ.get(
+    "GT7_RUN_INTEGRATION_TESTS", ""
+).lower() in {"1", "true", "yes"}
 
 
 class RecordingSocket:
@@ -172,8 +175,8 @@ class PacketDecoderTest(unittest.TestCase):
         self.assertEqual([-3.75], lap.data_sway_acceleration)
         self.assertEqual([4.0], lap.data_heave_acceleration)
         self.assertEqual([5.5], lap.data_surge_acceleration)
-        self.assertEqual([], lap.data_throttle_filtered_percent)
-        self.assertEqual([], lap.data_surface_type_fl)
+        self.assertEqual([None], lap.data_throttle_filtered_percent)
+        self.assertEqual([None], lap.data_surface_type_fl)
 
     def test_records_packet_tilde_extension_fields_in_lap(self):
         lap = self.record_extension_packet('~')
@@ -187,7 +190,7 @@ class PacketDecoderTest(unittest.TestCase):
         self.assertEqual([3.0], lap.data_torque_vector_rl)
         self.assertEqual([-4.0], lap.data_torque_vector_rr)
         self.assertEqual([0.75], lap.data_energy_recovery)
-        self.assertEqual([], lap.data_surface_type_fl)
+        self.assertEqual([None], lap.data_surface_type_fl)
 
     def test_records_packet_c_extension_fields_in_lap(self):
         lap = self.record_extension_packet('C')
@@ -217,35 +220,63 @@ class PacketDecoderTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             gt7communication.GT7Communication('192.0.2.1', 'D')
 
+    def test_mixed_packet_formats_keep_extension_series_aligned(self):
+        communication = gt7communication.GT7Communication('192.0.2.1')
+        for packet_format in ('B', 'C'):
+            packet_size, xor_key = gt7communication.PACKET_FORMATS[packet_format]
+            plaintext = bytearray(packet_size)
+            struct.pack_into('<I', plaintext, 0x00, gt7communication.PACKET_MAGIC)
+            struct.pack_into('<I', plaintext, 0x70, 42)
+            struct.pack_into('<fffff', plaintext, 0x128, 1.25, 2.5, 3.75, 4.0, 5.5)
+            if packet_format == 'C':
+                plaintext[0x158:0x15C] = b'TCGS'
+            data = gt7communication.GTData(
+                gt7communication.salsa20_dec(encrypt_packet(plaintext, xor_key))
+            )
+            data.in_race = True
+            communication._log_data(data)
 
-# check if host is up
-def is_host_up(ip: str) -> bool:
-    response = os.system("ping -c 1 " + PLAYSTATION_IP)
+        lap = communication.current_lap
+        self.assertEqual('mixed', lap.telemetry_packet_format)
+        self.assertEqual(len(lap.data_time), len(lap.data_wheel_rotation_rad))
+        self.assertEqual(len(lap.data_time), len(lap.data_surface_type_fl))
+        self.assertEqual([None, 'T'], lap.data_surface_type_fl)
 
-    #and then check the response...
-    if response == 0:
-        return True
-    else:
-        return False
+    def test_discards_extension_series_that_are_entirely_unavailable(self):
+        lap = self.record_extension_packet('B')
+        self.assertEqual([None], lap.data_surface_type_fl)
+        lap.discard_unavailable_extension_data()
+        self.assertEqual([], lap.data_surface_type_fl)
+        self.assertEqual([1.25], lap.data_wheel_rotation_rad)
 
 
-@unittest.skipIf(not is_host_up(PLAYSTATION_IP),
-                 "Playstation host is not up on %s" % (PLAYSTATION_IP))
+@unittest.skipUnless(
+    RUN_INTEGRATION_TESTS,
+    "Set GT7_RUN_INTEGRATION_TESTS=true to run tests against a live Playstation",
+)
 class GT7CommunicationTest(unittest.TestCase):
     @classmethod
-    def setUpClass(self) -> None:
-        self.gt7comm = gt7communication.GT7Communication(PLAYSTATION_IP)
-        # Do not quit with the main process
-        self.gt7comm.daemon = False
-        self.gt7comm.start()
-        # Sleep until connection is setup
-        # TODO Add timeout
-        while not self.gt7comm.is_connected():
+    def setUpClass(cls) -> None:
+        packet_format = os.environ.get("GT7_PACKET_FORMAT", "A")
+        cls.gt7comm = gt7communication.GT7Communication(
+            PLAYSTATION_IP, packet_format
+        )
+        cls.gt7comm.start()
+        deadline = time.monotonic() + float(
+            os.environ.get("GT7_INTEGRATION_TIMEOUT_SECONDS", "15")
+        )
+        while not cls.gt7comm.is_connected() and time.monotonic() < deadline:
             time.sleep(0.1)
+        if not cls.gt7comm.is_connected():
+            cls.gt7comm.stop()
+            raise TimeoutError(
+                f"No GT7 telemetry received from {PLAYSTATION_IP} "
+                f"in packet format {packet_format} before the timeout"
+            )
 
     @classmethod
-    def tearDownClass(self) -> None:
-        self.gt7comm.stop()
+    def tearDownClass(cls) -> None:
+        cls.gt7comm.stop()
 
     def test_get_water_temp(self):
         car_data = self.gt7comm.get_last_data()

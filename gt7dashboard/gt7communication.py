@@ -450,55 +450,61 @@ class GT7Communication(Thread):
 
         self.current_lap.data_absolute_yaw_rate_per_second.append(abs(yaw_rate_per_second))
 
-        # Record extension fields as individual time series so they remain JSON
-        # primitives and share the same sample index as the existing lap data.
-        self.current_lap.telemetry_packet_format = data.packet_format
+        # Keep every extension series aligned with data_time even if the console
+        # changes or temporarily falls back to another known packet format.
+        if self.current_lap.telemetry_packet_format is None:
+            self.current_lap.telemetry_packet_format = data.packet_format
+        elif self.current_lap.telemetry_packet_format != data.packet_format:
+            self.current_lap.telemetry_packet_format = "mixed"
 
-        if data.wheel_rotation_rad is not None:
-            self.current_lap.data_wheel_rotation_rad.append(data.wheel_rotation_rad)
-            self.current_lap.data_steering_angular_velocity_rad_s.append(
-                data.steering_angular_velocity_rad_s
-            )
-            self.current_lap.data_sway_acceleration.append(data.sway_acceleration)
-            self.current_lap.data_heave_acceleration.append(data.heave_acceleration)
-            self.current_lap.data_surge_acceleration.append(data.surge_acceleration)
+        self.current_lap.data_wheel_rotation_rad.append(data.wheel_rotation_rad)
+        self.current_lap.data_steering_angular_velocity_rad_s.append(
+            data.steering_angular_velocity_rad_s
+        )
+        self.current_lap.data_sway_acceleration.append(data.sway_acceleration)
+        self.current_lap.data_heave_acceleration.append(data.heave_acceleration)
+        self.current_lap.data_surge_acceleration.append(data.surge_acceleration)
 
-        if data.throttle_filtered_percent is not None:
-            self.current_lap.data_throttle_filtered_percent.append(
-                data.throttle_filtered_percent
-            )
-            self.current_lap.data_brake_filtered_percent.append(
-                data.brake_filtered_percent
-            )
-            (
-                torque_vector_fl,
-                torque_vector_fr,
-                torque_vector_rl,
-                torque_vector_rr,
-            ) = data.torque_vectors
-            self.current_lap.data_torque_vector_fl.append(torque_vector_fl)
-            self.current_lap.data_torque_vector_fr.append(torque_vector_fr)
-            self.current_lap.data_torque_vector_rl.append(torque_vector_rl)
-            self.current_lap.data_torque_vector_rr.append(torque_vector_rr)
-            self.current_lap.data_energy_recovery.append(data.energy_recovery)
+        torque_vectors = data.torque_vectors or (None, None, None, None)
+        torque_vector_fl, torque_vector_fr, torque_vector_rl, torque_vector_rr = (
+            torque_vectors
+        )
+        self.current_lap.data_throttle_filtered_percent.append(
+            data.throttle_filtered_percent
+        )
+        self.current_lap.data_brake_filtered_percent.append(
+            data.brake_filtered_percent
+        )
+        self.current_lap.data_torque_vector_fl.append(torque_vector_fl)
+        self.current_lap.data_torque_vector_fr.append(torque_vector_fr)
+        self.current_lap.data_torque_vector_rl.append(torque_vector_rl)
+        self.current_lap.data_torque_vector_rr.append(torque_vector_rr)
+        self.current_lap.data_energy_recovery.append(data.energy_recovery)
+
+        surface_types = data.surface_type or (None, None, None, None)
+        surface_type_fl, surface_type_fr, surface_type_rl, surface_type_rr = (
+            surface_types
+        )
+        self.current_lap.data_surface_type_fl.append(surface_type_fl)
+        self.current_lap.data_surface_type_fr.append(surface_type_fr)
+        self.current_lap.data_surface_type_rl.append(surface_type_rl)
+        self.current_lap.data_surface_type_rr.append(surface_type_rr)
+        self.current_lap.data_current_lap_time_ms.append(data.current_lap_time_ms)
+
+        front_wheel_steering_angles = (
+            data.front_wheel_steering_angle_rad or (None, None)
+        )
+        front_left_steering_angle_rad, front_right_steering_angle_rad = (
+            front_wheel_steering_angles
+        )
+        self.current_lap.data_front_left_steering_angle_rad.append(
+            front_left_steering_angle_rad
+        )
+        self.current_lap.data_front_right_steering_angle_rad.append(
+            front_right_steering_angle_rad
+        )
 
         if data.surface_type is not None:
-            surface_type_fl, surface_type_fr, surface_type_rl, surface_type_rr = data.surface_type
-            self.current_lap.data_surface_type_fl.append(surface_type_fl)
-            self.current_lap.data_surface_type_fr.append(surface_type_fr)
-            self.current_lap.data_surface_type_rl.append(surface_type_rl)
-            self.current_lap.data_surface_type_rr.append(surface_type_rr)
-            self.current_lap.data_current_lap_time_ms.append(data.current_lap_time_ms)
-            (
-                front_left_steering_angle_rad,
-                front_right_steering_angle_rad,
-            ) = data.front_wheel_steering_angle_rad
-            self.current_lap.data_front_left_steering_angle_rad.append(
-                front_left_steering_angle_rad
-            )
-            self.current_lap.data_front_right_steering_angle_rad.append(
-                front_right_steering_angle_rad
-            )
             self.current_lap.wheel_base_m = data.wheel_base_m
             self.current_lap.car_category = data.car_category
 
@@ -538,6 +544,7 @@ class GT7Communication(Thread):
         self.current_lap.EstimatedTopSpeed = self.last_data.estimated_top_speed
 
         self.current_lap.lap_end_timestamp = datetime.datetime.now()
+        self.current_lap.discard_unavailable_extension_data()
 
         # Race is not in 0th lap, which is before starting the race.
         # We will only persist those laps that have crossed the starting line at least once
