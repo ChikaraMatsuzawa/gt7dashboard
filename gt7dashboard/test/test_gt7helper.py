@@ -104,6 +104,17 @@ class TestHelper(unittest.TestCase):
         self.assertEqual(len(df.distance), len(df.comparison))
         self.assertEqual(len(df.distance), len(df.reference))
 
+    def test_calculate_time_diff_by_distance_can_limit_shared_distance(self):
+        path = os.path.join(
+            os.getcwd(), 'test_data', 'broad_bean_raceway_time_trial_4laps.json'
+        )
+        laps = gt7helper.load_laps_from_json(path)
+
+        df = calculate_time_diff_by_distance(laps[0], laps[1], max_distance=500)
+
+        self.assertGreater(len(df), 0)
+        self.assertLessEqual(df.distance.max(), 500)
+
     def test_calculate_time_diff_by_distance(self):
         best_lap = Lap()
         best_lap.data_time = [0, 2, 6, 12, 22, 45, 60, 70]

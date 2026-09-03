@@ -1,4 +1,5 @@
 import copy
+import html
 import itertools
 import logging
 import os
@@ -10,15 +11,29 @@ from bokeh.driving import linear
 from bokeh.layouts import column, layout, row
 from bokeh.models import (
     Select,
+    MultiChoice,
     Paragraph,
     Button,
-    Div, CheckboxGroup, TabPanel, Tabs,
+    ColumnDataSource,
+    DataTable,
+    Div,
+    CheckboxGroup,
+    TableColumn,
+    TabPanel,
+    Tabs,
 )
 from bokeh.palettes import Plasma11 as palette
 from bokeh.plotting import curdoc
 from bokeh.plotting import figure
 
-from gt7dashboard import gt7communication, gt7diagrams, gt7help, gt7helper, gt7lap
+from gt7dashboard import (
+    gt7communication,
+    gt7comparison,
+    gt7diagrams,
+    gt7help,
+    gt7helper,
+    gt7lap,
+)
 from gt7dashboard.gt7diagrams import get_speed_peak_and_valley_diagram
 
 from gt7dashboard.gt7help import get_help_div
@@ -52,6 +67,9 @@ def update_reference_lap_select(laps):
 @linear()
 def update_fuel_map(step):
     global g_stored_fuel_map
+
+    if g_display_mode == "comparison":
+        return
 
     if len(app.gt7comm.laps) == 0:
         div_fuel_map.text = ""
@@ -97,10 +115,27 @@ def update_race_lines(laps: List[Lap], reference_lap: Lap):
         # Fixme not working
         race_lines[i].x_range = race_lines[0].x_range
 
+    # The live session may have fewer laps than the previously rendered view.
+    # Empty the remaining race-line panels instead of retaining stale traces.
+    empty_lap_data = Lap().get_data_dict()
+    for i in range(min(len(laps), len(race_lines)), len(race_lines)):
+        for renderer in race_lines_data[i]:
+            renderer.data_source.data = empty_lap_data
+        gt7diagrams.remove_all_annotation_text_from_figure(race_lines[i])
 
-def update_header_line(div: Div, last_lap: Lap, reference_lap: Lap):
-    div.text = f"<p><b>Last Lap: {last_lap.title} ({last_lap.car_name()})<b></p>" \
-               f"<p><b>Reference Lap: {reference_lap.title} ({reference_lap.car_name()})<b></p>"
+
+def update_header_line(
+    div: Div,
+    comparison_lap: Lap,
+    reference_lap: Lap,
+    comparison_heading: str = "Last Lap",
+):
+    comparison_title = html.escape(str(comparison_lap.title))
+    reference_title = html.escape(str(reference_lap.title))
+    div.text = (
+        f"<b>{html.escape(comparison_heading)}:</b> {comparison_title}"
+        f"&nbsp;&nbsp;<b>Reference Lap:</b> {reference_title}"
+    )
 
 def update_lap_change():
     """
@@ -113,6 +148,7 @@ def update_lap_change():
     global g_connection_status_stored
     global g_telemetry_update_needed
     global g_reference_lap_selected
+    global g_stored_fuel_map
 
     update_start_time = time.time()
 
@@ -125,6 +161,11 @@ def update_lap_change():
     if app.gt7comm.is_connected() != g_connection_status_stored:
         update_connection_info()
         g_connection_status_stored = copy.copy(app.gt7comm.is_connected())
+
+    # Saved-file comparison intentionally owns the diagrams until it is
+    # cleared. Incoming live packets must not overwrite that selection.
+    if g_display_mode == "comparison":
+        return
 
     # This saves on cpu time, 99.9% of the time this is true
     if laps == g_laps_stored and not g_telemetry_update_needed:
@@ -146,6 +187,14 @@ def update_lap_change():
             div_speed_peak_valley_diagram.text = get_speed_peak_and_valley_diagram(last_lap, reference_lap)
 
         update_header_line(div_header_line, last_lap, reference_lap)
+    else:
+        # A saved-file comparison may have been cleared while no live laps are
+        # available yet. Do not leave its labels or fuel table on screen.
+        div_header_line.text = ""
+        div_speed_peak_valley_diagram.text = ""
+        div_deviance_laps_on_display.text = ""
+        div_fuel_map.text = ""
+        g_stored_fuel_map = None
 
     logger.debug("Updating of %d laps" % len(laps))
 
@@ -234,6 +283,112 @@ def update_speed_velocity_graph(laps: List[Lap]):
         update_break_points(reference_lap, s_race_line, "magenta")
 
 
+def _empty_time_diff_data():
+    return {
+        "distance": [],
+        "timedelta": [],
+        "reference": [],
+        "comparison": [],
+    }
+
+
+def clear_comparison_diagrams():
+    """Clear a previously active saved-file comparison without touching live laps."""
+    global g_stored_fuel_map
+
+    empty_lap_data = Lap().get_data_dict()
+    race_diagram.delete_all_additional_laps()
+    race_diagram.source_last_lap.data = empty_lap_data
+    race_diagram.source_reference_lap.data = empty_lap_data
+    race_diagram.source_median_lap.data = empty_lap_data
+    race_diagram.source_time_diff.data = _empty_time_diff_data()
+    race_diagram.clear_analysis_domain()
+    race_diagram.update_steering_visibility()
+    linked_race_line.update_laps(None, None)
+    for i, renderer_group in enumerate(race_lines_data):
+        for renderer in renderer_group:
+            renderer.data_source.data = empty_lap_data
+        gt7diagrams.remove_all_annotation_text_from_figure(race_lines[i])
+    div_header_line.text = ""
+    div_speed_peak_valley_diagram.text = ""
+    div_deviance_laps_on_display.text = ""
+    div_fuel_map.text = ""
+    g_stored_fuel_map = None
+
+
+def restore_live_display():
+    """Give the live session ownership of the diagrams after a comparison."""
+    global g_display_mode
+    global g_telemetry_update_needed
+
+    clear_comparison_diagrams()
+    g_display_mode = "live"
+    g_telemetry_update_needed = True
+    update_lap_change()
+
+
+def render_saved_lap_comparison(
+    reference_record: gt7comparison.ComparisonLap,
+    comparison_record: gt7comparison.ComparisonLap,
+    overlay_records: List[gt7comparison.ComparisonLap],
+    shared_distance_m: float,
+):
+    """Render one explicit pair and optional overlays from saved files."""
+    global g_stored_fuel_map
+
+    reference_lap = reference_record.lap
+    comparison_lap = comparison_record.lap
+    comparison_data = comparison_lap.get_data_dict()
+    reference_data = reference_lap.get_data_dict()
+
+    race_diagram.delete_all_additional_laps()
+    race_diagram.source_last_lap.data = comparison_data
+    race_diagram.source_reference_lap.data = reference_data
+    race_diagram.source_median_lap.data = Lap().get_data_dict()
+    race_diagram.source_time_diff.data = calculate_time_diff_by_distance(
+        reference_lap,
+        comparison_lap,
+        max_distance=shared_distance_m,
+    )
+    race_diagram.update_analysis_domain([0, shared_distance_m])
+
+    for style, overlay_record in zip(COMPARISON_OVERLAY_STYLES, overlay_records):
+        color, line_dash = style
+        race_diagram.add_additional_lap_to_race_diagram(
+            color,
+            overlay_record.lap,
+            visible=True,
+            line_dash=line_dash,
+        )
+
+    race_diagram.update_steering_visibility()
+    linked_race_line.update_laps(comparison_data, reference_data)
+    s_race_line.axis.visible = False
+
+    update_header_line(
+        div_header_line,
+        comparison_lap,
+        reference_lap,
+        comparison_heading="Comparison Lap",
+    )
+    div_speed_peak_valley_diagram.text = get_speed_peak_and_valley_diagram(
+        comparison_lap, reference_lap
+    )
+
+    variance_laps = [reference_lap, comparison_lap] + [
+        record.lap for record in overlay_records
+    ]
+    fastest_laps = race_diagram.update_fastest_laps_variance(variance_laps)
+    div_deviance_laps_on_display.text = "".join(
+        f"<b>Lap {lap.number}:</b> {html.escape(str(lap.title))}<br>"
+        for lap in fastest_laps
+    )
+
+    update_race_lines([comparison_lap], reference_lap)
+    g_stored_fuel_map = comparison_lap
+    div_fuel_map.text = gt7diagrams.get_fuel_map_html_table(comparison_lap)
+
+
 def update_break_points(lap: Lap, race_line: figure, color: str):
     brake_points_x, brake_points_y = gt7helper.get_brake_points(lap)
 
@@ -260,7 +415,8 @@ def update_time_table(laps: List[Lap]):
 def reset_button_handler(event):
     global g_telemetry_update_needed
     logger.info("reset button clicked")
-    race_diagram.delete_all_additional_laps()
+    if g_display_mode != "comparison":
+        race_diagram.delete_all_additional_laps()
 
     app.gt7comm.load_laps([], replace_other_laps=True)
     app.gt7comm.reset()
@@ -285,12 +441,25 @@ def save_button_handler(event):
     if len(app.gt7comm.laps) > 0:
         path = save_laps_to_json(app.gt7comm.laps)
         logger.info("Saved %d laps as %s" % (len(app.gt7comm.laps), path))
+        refresh_saved_lap_file_options()
 
 
 def load_laps_handler(attr, old, new):
+    global g_display_mode
+    global g_telemetry_update_needed
+
+    if not new:
+        return
     logger.info("Loading %s" % new)
-    race_diagram.delete_all_additional_laps()
+    was_comparison = g_display_mode == "comparison"
+    g_display_mode = "live"
+    if was_comparison:
+        clear_comparison_diagrams()
+    else:
+        race_diagram.delete_all_additional_laps()
     app.gt7comm.load_laps(load_laps_from_json(new), replace_other_laps=True)
+    g_telemetry_update_needed = True
+    update_lap_change()
 
 
 def load_reference_lap_handler(attr, old, new):
@@ -307,6 +476,229 @@ def load_reference_lap_handler(attr, old, new):
 
     g_telemetry_update_needed = True
     update_lap_change()
+
+
+def refresh_saved_lap_file_options():
+    """Refresh both saved-file pickers after a new recording is saved."""
+    global stored_lap_files
+
+    stored_lap_files = gt7helper.bokeh_tuple_for_list_of_lapfiles(
+        list_lap_files_from_path(os.path.join(os.getcwd(), "data"))
+    )
+    select.options = stored_lap_files
+    comparison_file_select.options = [option for option in stored_lap_files if option]
+
+
+def set_comparison_status(message: str, tone: str = "neutral"):
+    colors = {
+        "neutral": "#475569",
+        "success": "#166534",
+        "warning": "#92400e",
+        "error": "#b91c1c",
+    }
+    color = colors.get(tone, colors["neutral"])
+    comparison_status.text = (
+        f"<span style='color:{color};'>{html.escape(message)}</span>"
+    )
+
+
+def _comparison_record(record_id: str):
+    return g_comparison_records_by_id.get(record_id)
+
+
+def _clear_active_comparison_if_needed():
+    if g_display_mode == "comparison":
+        clear_comparison_diagrams()
+
+
+def update_saved_lap_comparison():
+    """Validate the selected saved laps and refresh the comparison display."""
+    global g_display_mode
+
+    reference_record = _comparison_record(comparison_reference_select.value)
+    comparison_record = _comparison_record(comparison_lap_select.value)
+
+    if reference_record is None or comparison_record is None:
+        _clear_active_comparison_if_needed()
+        set_comparison_status(
+            "Choose one reference lap and one comparison lap to start.",
+            "neutral",
+        )
+        return
+
+    if reference_record.identifier == comparison_record.identifier:
+        _clear_active_comparison_if_needed()
+        set_comparison_status(
+            "Reference and comparison must be different laps.", "error"
+        )
+        return
+
+    compatibility = gt7comparison.assess_lap_compatibility(
+        reference_record.lap, comparison_record.lap
+    )
+    if not compatibility.compatible:
+        _clear_active_comparison_if_needed()
+        set_comparison_status(compatibility.message, "error")
+        return
+
+    overlays = []
+    skipped_overlays = []
+    for record_id in g_comparison_overlay_ids:
+        overlay_record = _comparison_record(record_id)
+        if overlay_record is None:
+            continue
+        overlay_compatibility = gt7comparison.assess_lap_compatibility(
+            reference_record.lap, overlay_record.lap
+        )
+        if overlay_compatibility.compatible:
+            overlays.append(overlay_record)
+        else:
+            skipped_overlays.append(overlay_record.select_label)
+
+    g_display_mode = "comparison"
+    render_saved_lap_comparison(
+        reference_record,
+        comparison_record,
+        overlays,
+        compatibility.shared_distance_m,
+    )
+
+    message = compatibility.message
+    if overlays:
+        message += f" Showing {len(overlays)} overlay lap(s)."
+    if skipped_overlays:
+        message += " Some selected overlays were skipped because they are incompatible."
+    set_comparison_status(
+        message,
+        "warning" if compatibility.warning or skipped_overlays else "success",
+    )
+
+
+def comparison_role_handler(attr, old, new):
+    if g_comparison_widgets_updating:
+        return
+    update_saved_lap_comparison()
+
+
+def comparison_table_selection_handler(attr, old, new):
+    global g_comparison_overlay_ids
+    global g_comparison_widgets_updating
+
+    if g_comparison_widgets_updating:
+        return
+
+    selected_ids = []
+    retained_indices = []
+    for index in comparison_lap_source.selected.indices:
+        identifiers = comparison_lap_source.data.get("identifier", [])
+        if index >= len(identifiers):
+            continue
+        record_id = identifiers[index]
+        if record_id in {
+            comparison_reference_select.value,
+            comparison_lap_select.value,
+        }:
+            continue
+        if len(selected_ids) < MAX_COMPARISON_OVERLAYS:
+            selected_ids.append(record_id)
+            retained_indices.append(index)
+
+    if comparison_lap_source.selected.indices != retained_indices:
+        g_comparison_widgets_updating = True
+        comparison_lap_source.selected.indices = retained_indices
+        g_comparison_widgets_updating = False
+
+    g_comparison_overlay_ids = selected_ids
+    update_saved_lap_comparison()
+
+
+def _reset_comparison_role_widgets():
+    global g_comparison_widgets_updating
+
+    g_comparison_widgets_updating = True
+    options = [("", "Choose a lap")] + [
+        (record.identifier, record.select_label)
+        for record in g_comparison_records
+    ]
+    comparison_reference_select.options = options
+    comparison_lap_select.options = options
+    comparison_reference_select.value = ""
+    comparison_lap_select.value = ""
+    comparison_lap_source.selected.indices = []
+    g_comparison_widgets_updating = False
+
+
+def load_comparison_files_handler():
+    global g_comparison_records
+    global g_comparison_records_by_id
+    global g_comparison_overlay_ids
+    global g_display_mode
+    global g_telemetry_update_needed
+
+    selected_paths = list(comparison_file_select.value)
+    if not selected_paths:
+        set_comparison_status("Choose one or more saved JSON files first.", "warning")
+        return
+
+    result = gt7comparison.load_comparison_laps(selected_paths)
+    g_comparison_records = result.records
+    g_comparison_records_by_id = {
+        record.identifier: record for record in g_comparison_records
+    }
+    g_comparison_overlay_ids = []
+    comparison_lap_source.data = gt7comparison.comparison_table_data(
+        g_comparison_records
+    )
+    _reset_comparison_role_widgets()
+
+    if g_display_mode == "comparison":
+        restore_live_display()
+
+    if not g_comparison_records:
+        detail = " ".join(result.errors) if result.errors else "No laps were found."
+        set_comparison_status(detail, "error")
+        return
+
+    message = (
+        f"Loaded {len(g_comparison_records)} lap(s) from "
+        f"{len(selected_paths)} file(s). Choose the reference and comparison laps."
+    )
+    if result.errors:
+        message += " Some files could not be read."
+    set_comparison_status(message, "success")
+
+
+def clear_comparison_files_handler():
+    global g_comparison_records
+    global g_comparison_records_by_id
+    global g_comparison_overlay_ids
+    global g_display_mode
+    global g_telemetry_update_needed
+
+    was_comparison = g_display_mode == "comparison"
+    g_comparison_records = []
+    g_comparison_records_by_id = {}
+    g_comparison_overlay_ids = []
+    comparison_file_select.value = []
+    comparison_lap_source.data = gt7comparison.comparison_table_data([])
+    _reset_comparison_role_widgets()
+
+    if was_comparison:
+        restore_live_display()
+    else:
+        g_display_mode = "live"
+    set_comparison_status("Saved-file comparison cleared. Live session display restored.")
+
+
+def toggle_comparison_panel_handler():
+    comparison_panel.visible = not comparison_panel.visible
+    comparison_panel_toggle.label = (
+        "Hide Saved-file Comparison"
+        if comparison_panel.visible
+        else "Compare Saved Files"
+    )
+    if comparison_panel.visible:
+        refresh_saved_lap_file_options()
 
 
 
@@ -386,6 +778,17 @@ g_connection_status_stored = None
 g_reference_lap_selected = None
 g_stored_fuel_map = None
 g_telemetry_update_needed = False
+g_display_mode = "live"
+g_comparison_records: List[gt7comparison.ComparisonLap] = []
+g_comparison_records_by_id: dict[str, gt7comparison.ComparisonLap] = {}
+g_comparison_overlay_ids: List[str] = []
+g_comparison_widgets_updating = False
+
+MAX_COMPARISON_OVERLAYS = 2
+COMPARISON_OVERLAY_STYLES = [
+    ("#ea580c", "dotdash"),
+    ("#475569", "dotted"),
+]
 
 stored_lap_files = gt7helper.bokeh_tuple_for_list_of_lapfiles(
     list_lap_files_from_path(os.path.join(os.getcwd(), "data"))
@@ -401,6 +804,9 @@ def table_row_selection_callback(attrname, old, new):
     global race_diagram
     global race_time_table
     global colors
+
+    if g_display_mode == "comparison":
+        return
 
     selectionIndex=race_time_table.lap_times_source.selected.indices
     logger.info("you have selected the row nr "+str(selectionIndex))
@@ -441,6 +847,120 @@ select.on_change("value", load_laps_handler)
 reference_lap_select = Select(value="laps")
 reference_lap_select.on_change("value", load_reference_lap_handler)
 
+comparison_panel_toggle = Button(label="Compare Saved Files")
+comparison_panel_toggle.on_click(toggle_comparison_panel_handler)
+
+comparison_file_select = MultiChoice(
+    title="Saved files to compare",
+    options=[option for option in stored_lap_files if option],
+    placeholder="Choose one or more saved JSON files",
+    sizing_mode="stretch_width",
+)
+comparison_load_button = Button(label="Load Selected Files")
+comparison_load_button.on_click(load_comparison_files_handler)
+comparison_clear_button = Button(label="Clear Comparison")
+comparison_clear_button.on_click(clear_comparison_files_handler)
+
+comparison_reference_select = Select(
+    title="Reference lap",
+    value="",
+    options=[("", "Choose a lap")],
+    sizing_mode="stretch_width",
+)
+comparison_reference_select.on_change("value", comparison_role_handler)
+comparison_lap_select = Select(
+    title="Comparison lap",
+    value="",
+    options=[("", "Choose a lap")],
+    sizing_mode="stretch_width",
+)
+comparison_lap_select.on_change("value", comparison_role_handler)
+
+comparison_lap_source = ColumnDataSource(
+    data=gt7comparison.comparison_table_data([])
+)
+comparison_lap_table = DataTable(
+    source=comparison_lap_source,
+    columns=[
+        TableColumn(field="source", title="File"),
+        TableColumn(field="number", title="Lap"),
+        TableColumn(field="time", title="Time"),
+        TableColumn(field="car_name", title="Car"),
+        TableColumn(field="timestamp", title="Recorded"),
+        TableColumn(field="distance", title="Distance"),
+        TableColumn(field="status", title="Status"),
+    ],
+    index_position=None,
+    height=230,
+    sizing_mode="stretch_width",
+)
+comparison_lap_source.selected.on_change(
+    "indices", comparison_table_selection_handler
+)
+
+comparison_key = Div(
+    text=(
+        "<span style='color:#2563eb;'>● solid</span> comparison · "
+        "<span style='color:#a21caf;'>● dashed</span> reference · "
+        "<span style='color:#ea580c;'>● dot-dash</span> overlay 1 · "
+        "<span style='color:#475569;'>● dotted</span> overlay 2"
+    ),
+    sizing_mode="stretch_width",
+)
+comparison_status = Div(
+    text="Choose saved files, then assign a reference and comparison lap.",
+    sizing_mode="stretch_width",
+)
+
+RESPONSIVE_WRAP_STYLESHEET = """
+@media (max-width: 1100px) {
+  :host {
+    flex-wrap: wrap !important;
+    height: fit-content !important;
+  }
+}
+"""
+RESPONSIVE_FULL_WIDTH_STYLESHEET = """
+@media (max-width: 1100px) {
+  :host {
+    width: 100% !important;
+    min-width: 100% !important;
+    flex-basis: 100% !important;
+  }
+}
+"""
+
+comparison_panel = column(
+    row(
+        comparison_file_select,
+        comparison_load_button,
+        comparison_clear_button,
+        sizing_mode="stretch_width",
+        spacing=6,
+        stylesheets=[RESPONSIVE_WRAP_STYLESHEET],
+    ),
+    row(
+        comparison_reference_select,
+        comparison_lap_select,
+        sizing_mode="stretch_width",
+        spacing=6,
+        stylesheets=[RESPONSIVE_WRAP_STYLESHEET],
+    ),
+    comparison_key,
+    comparison_status,
+    Div(
+        text=(
+            "Select up to two additional rows below to overlay them on the "
+            "telemetry graphs."
+        ),
+        sizing_mode="stretch_width",
+    ),
+    comparison_lap_table,
+    visible=False,
+    sizing_mode="stretch_width",
+    spacing=4,
+)
+
 manual_log_button = Button(label="Log Lap Now")
 manual_log_button.on_click(log_lap_button_handler)
 
@@ -470,24 +990,6 @@ checkbox_group = CheckboxGroup(labels=LABELS, active=[1])
 checkbox_group.on_change("active", always_record_checkbox_handler)
 
 race_time_table.t_lap_times.sizing_mode = "stretch_width"
-
-RESPONSIVE_WRAP_STYLESHEET = """
-@media (max-width: 1100px) {
-  :host {
-    flex-wrap: wrap !important;
-    height: fit-content !important;
-  }
-}
-"""
-RESPONSIVE_FULL_WIDTH_STYLESHEET = """
-@media (max-width: 1100px) {
-  :host {
-    width: 100% !important;
-    min-width: 100% !important;
-    flex-basis: 100% !important;
-  }
-}
-"""
 RESPONSIVE_MAP_STYLESHEET = """
 @media (max-width: 1100px) {
   :host {
@@ -527,6 +1029,7 @@ manual_controls = row(
     manual_log_button,
     checkbox_group,
     reference_lap_select,
+    comparison_panel_toggle,
     get_help_div(gt7help.MANUAL_CONTROLS),
     sizing_mode="stretch_width",
     stylesheets=[RESPONSIVE_WRAP_STYLESHEET],
@@ -620,6 +1123,7 @@ lap_summary = row(
 l1 = column(
     header_controls,
     manual_controls,
+    comparison_panel,
     analysis_workspace,
     lap_summary,
     sizing_mode="stretch_width",

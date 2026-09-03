@@ -15,31 +15,33 @@ The list on the right hand side shows your best laps that are taken into conside
 
 HEADER = """The red or green button reflects the current connection status to Gran Turismo 7. i.e. if there was a packet received successfully in the last second, the button will turn green.
 
-Next is a brief description of the last and reference lap. The reference lap can be selected on the right side."""
+Next is a brief description of the last and reference lap. During saved-file comparison, this instead shows the selected comparison and reference laps."""
 RACE_LINE_MINI = """This race line follows the distance selected in the analysis window. The large view automatically fits the selected section; the smaller view keeps the full course in context.
 
-The last lap is blue and the reference lap is magenta."""
+The comparison lap is blue and the reference lap is magenta."""
 MANUAL_CONTROLS = """'Log Lap Now' will log a lap now even if you have not crossed the finish line. This is helpful for missions or license tests where the end of a test is not necessarily identical with the finish line.
 
 The checkbox 'Record Replays' will allow you to record replays. Be careful since also background action before and after a time trial is counted as a replay. This is when a car drives on the track in the background of the menu.
 
 In the 'Best Lap' dropdown list you can select the reference lap. Usually this will point to the best lap of the session.
+
+Use 'Compare Saved Files' to choose multiple saved JSON files, then select an explicit reference lap and comparison lap. You can select up to two more rows as graph overlays.
 """
 
-TIME_DIFF = """This is a graph for showing the relative time difference between the last lap and the reference lap.
-Values above zero mean the last lap is slower than the reference lap. Values below zero mean it is faster.
+TIME_DIFF = """This is a graph for showing the relative time difference between the comparison lap and the reference lap.
+Values above zero mean the comparison lap is slower than the reference lap. Values below zero mean it is faster.
 
-The value is calculated as Last minus Reference at the same distance around the track.
+The value is calculated as Comparison minus Reference at the same distance around the track.
 """
 LAP_CONTROLS = """You can reset all laps with the 'Reset Laps' button. This is helpful if you are switching tracks or cars in a session. Otherwise the different tracks will mix in the dashboard.
 'Save Laps' will save your recorded laps to a file. You can load the laps afterwards with the dropdown list to the right."""
-LAP_LINE_STYLES = """Last lap is a blue solid line, reference lap is a magenta dashed line, and the median lap is a gray dotted line."""
+LAP_LINE_STYLES = """The comparison lap is a blue solid line and the reference lap is a magenta dashed line. In live mode, the comparison lap is the latest lap; the median lap is a gray dotted line. Saved-file comparison can add orange dot-dash and dark-gray dotted overlays."""
 SPEED_DIAGRAM = """The total speed of the laps selected. This value is in km/h. or mph. depending on your in-game setting.
 
 """ + LAP_LINE_STYLES
 THROTTLE_DIAGRAM = """This is the amount of throttle pressure from 0% to 100% of the laps selected."""
 BRAKING_DIAGRAM = """This is the amount of braking pressure from 0% to 100% of the laps selected."""
-PEDAL_INPUTS_DIAGRAM = """Throttle and brake are shown together on the same 0% to 100% scale. Throttle is green and brake is red. Solid lines are the last lap and dashed lines are the reference lap. These fixed colors and line styles replace a separate legend."""
+PEDAL_INPUTS_DIAGRAM = """Throttle and brake are shown together on the same 0% to 100% scale. Throttle is green and brake is red. Solid lines are the comparison lap and dashed lines are the reference lap. These fixed colors and line styles replace a separate legend."""
 STEERING_DIAGRAM = """The mean of the front-left and front-right wheel steering angles, shown in degrees. This data is available when laps are recorded with packet format C. The chart starts at a symmetric ±10° scale and expands in 5° steps when needed.
 
 """ + LAP_LINE_STYLES
@@ -50,7 +52,7 @@ RPM_DIAGRAM = "This is the current RPM of the laps selected."
 BOOST_DIAGRAM = "This is the current Boost in x100 kPa of the laps selected."
 TIRE_DIAGRAM = """This is the relation between the speed of the tires and the speed of the car. If your tires are faster than your car, your tires might be spinning. If they are slower, your tires might be blocking. Use this to judge your car control."""
 
-SPEED_PEAKS_AND_VALLEYS = """A list of speed peaks and valleys for the selected laps. We assume peaks are straights (s) and valleys are turns (T). Use this to compare the difference in speed between the last lap and the reference lap on given positions of the race track."""
+SPEED_PEAKS_AND_VALLEYS = """A list of speed peaks and valleys for the selected laps. We assume peaks are straights (s) and valleys are turns (T). Use this to compare the difference in speed between the comparison lap and the reference lap on given positions of the race track."""
 TIME_TABLE = """A table with logged information of the session. # is the number of the lap as reported by the game. There might be multiple laps of the same number if you restarted a session. Time and Diff are self-explaining. Info will hold additional meta data, for example if this lap was a replay.
 Fuel Consumed is the amount of fuel consumed in the lap.
 
@@ -66,9 +68,9 @@ The current fuel setting will always be at 0. If you want to change the fuel to 
 It will give you a raw assumption of the laps and time remaining and the assumed time difference in lap time for the new setting."""
 TUNING_INFO = """Here is some useful information you may use for tuning. Such as Max Speed and minimal body height in relation to the track. The latter seems to be helpful when determining the possible body height."""
 
-RACE_LINE_BIG = """This is a race line map with the last lap (blue) and the reference lap (magenta). This diagram does also feature speed peaks (▴) and valleys (▾) as well as throttle, brake and coasting zones.
+RACE_LINE_BIG = """This is a race line map with the comparison lap (blue) and the reference lap (magenta). This diagram does also feature speed peaks (▴) and valleys (▾) as well as throttle, brake and coasting zones.
 
-The thinner line of the two is your last lap. The reference line is the thicker translucent line. If you want to make out differences in the race line have a look at the middle of the reference lap line and your line. You may zoom in to spot the differences and read the values on peaks and valleys.
+The thinner line of the two is your comparison lap. The reference line is the thicker translucent line. If you want to make out differences in the race line have a look at the middle of the reference lap line and your line. You may zoom in to spot the differences and read the values on peaks and valleys.
 """
 
 YAW_RATE_DIAGRAM = """This is the yaw rate per second of your car. Use this to determine the Maximum Rotation Point (MRP). At this point you should normally accelerate."""

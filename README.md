@@ -19,6 +19,8 @@ See the [Manual](#manual) for detailed instructions.
 * Speed Variance Graph showing speed deviation in your best laps
 * Picker for Reference Lap
   * Default is Best Lap
+* Compare explicit laps from multiple saved JSON files
+  * Choose a reference, comparison, and up to two overlay laps without replacing the live session
 * Combined Throttle and Braking graph on the same 0% to 100% axis
 * Front-wheel steering angle graph for packet format C laps
 * Coasting/Distance Graph
@@ -162,14 +164,20 @@ Next is a brief description of the last and reference lap. The reference lap can
 You can reset all laps with the 'Reset Laps' button. This is helpful if you are switching tracks or cars in a session. Otherwise the different tracks will mix in the dashboard.
 'Save Laps' will save your recorded laps to a file. You can load the laps afterwards with the dropdown list to the right.
 
+#### Saved-file Comparison
+
+Use **Compare Saved Files** to open the saved-file comparison panel. Select one or more JSON files, load them into the source-aware lap table, then choose an explicit reference lap and comparison lap. Select up to two more table rows to overlay their telemetry traces.
+
+The comparison lap is blue and solid; the reference lap is magenta and dashed. Overlays use orange dot-dash and dark-gray dotted lines. The time-difference chart shows comparison minus reference, and the analysis window is limited to the distance shared by both selected laps. Laps with substantially different total distances are not compared; a start/finish-position mismatch is shown as a warning because saved telemetry does not contain an explicit circuit id.
+
 #### Time / Diff
 
 ![screenshot_header](README.assets/screenshot_timediff.png)
 
-This is a graph for showing the relative time difference between the last lap and the reference lap.
-Values above zero mean the last lap is slower than the reference lap. Values below zero mean it is faster.
+This is a graph for showing the relative time difference between the comparison lap and the reference lap.
+Values above zero mean the comparison lap is slower than the reference lap. Values below zero mean it is faster.
 
-The value is calculated as Last minus Reference at the same distance around the track.
+The value is calculated as Comparison minus Reference at the same distance around the track.
 
 
 #### Manual Controls
@@ -191,7 +199,7 @@ Select a section of the lap by distance. Drag the highlighted region to move it,
 
 ![screenshot_header](README.assets/screenshot_speed.png)
 
-The total speed of the laps selected. This value is in km/h. or mph. depending on your in-game setting. Last lap is a blue solid line, reference lap is a magenta dashed line, and the median lap is a gray dotted line.
+The total speed of the laps selected. This value is in km/h. or mph. depending on your in-game setting. The comparison lap is a blue solid line, the reference lap is a magenta dashed line, and the median lap is a gray dotted line in live mode.
 
 #### Race Line
 
@@ -199,13 +207,13 @@ The total speed of the laps selected. This value is in km/h. or mph. depending o
 
 This race line follows the distance selected in the analysis window. The large view automatically fits the selected section; the smaller view keeps the full course in context.
 
-The last lap is blue and the reference lap is magenta.
+The comparison lap is blue and the reference lap is magenta.
 
 #### Peaks and Valleys
 
 ![screenshot_header](README.assets/screenshot_peaks_and_valleys.png)
 
-A list of speed peaks and valleys for the selected laps. We assume peaks are straights (s) and valleys are turns (T). Use this to compare the difference in speed between the last lap and the reference lap on given positions of the race track.
+A list of speed peaks and valleys for the selected laps. We assume peaks are straights (s) and valleys are turns (T). Use this to compare the difference in speed between the comparison lap and the reference lap on given positions of the race track.
 
 #### Speed Deviation (Spd. Dev.)
 
@@ -228,7 +236,7 @@ If they had one graph it would be the deviation in the (best) laps of the same d
 
 #### Pedal Inputs
 
-Throttle and brake are shown together on the same 0% to 100% scale. Throttle is green and brake is red. Solid lines are the last lap and dashed lines are the reference lap; these fixed styles replace a separate legend.
+Throttle and brake are shown together on the same 0% to 100% scale. Throttle is green and brake is red. Solid lines are the comparison lap and dashed lines are the reference lap; these fixed styles replace a separate legend.
 
 #### Yaw Rate / Second
 
@@ -240,7 +248,7 @@ This is the yaw rate per second of your car. Use this to determine the Maximum R
 
 #### Steering Angle
 
-The mean of the front-left and front-right wheel steering angles is shown in degrees. This data is available when laps are recorded with packet format C. The chart starts at a symmetric ±10° scale and expands in 5° steps when needed. Last lap is a blue solid line and reference lap is a magenta dashed line.
+The mean of the front-left and front-right wheel steering angles is shown in degrees. This data is available when laps are recorded with packet format C. The chart starts at a symmetric ±10° scale and expands in 5° steps when needed. The comparison lap is a blue solid line and the reference lap is a magenta dashed line.
 
 #### Coasting
 
@@ -305,6 +313,6 @@ Here is some useful information you may use for tuning. Such as Max Speed and mi
 
 ![screenshot_header](README.assets/screenshot_race_line.png)
 
-This is a race line map with the last lap (blue) and the reference lap (magenta). This diagram does also feature speed peaks (▴) and valleys (▾) as well as throttle, brake and coasting zones.
+This is a race line map with the comparison lap (blue) and the reference lap (magenta). This diagram does also feature speed peaks (▴) and valleys (▾) as well as throttle, brake and coasting zones.
 
-The thinner line of the two is your last lap. The reference line is the thicker translucent line. If you want to make out differences in the race line have a look at the middle of the reference lap line and your line. You may zoom in to spot the differences and read the values on peaks and valleys.
+The thinner line of the two is your comparison lap. The reference line is the thicker translucent line. If you want to make out differences in the race line have a look at the middle of the reference lap line and your line. You may zoom in to spot the differences and read the values on peaks and valleys.

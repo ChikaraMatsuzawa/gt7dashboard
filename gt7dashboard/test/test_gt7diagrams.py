@@ -250,6 +250,16 @@ class TestHelper(unittest.TestCase):
             data = fp.read()
             self.assertNotIn("1:28.465", data)
 
+    def test_additional_lap_can_use_a_distinct_line_dash(self):
+        rd = self.helper_get_race_diagram()
+
+        rd.add_additional_lap_to_race_diagram(
+            "orange", self.test_laps[1], line_dash="dotted"
+        )
+
+        self.assertEqual([2, 4], rd.speed_lines[-1].glyph.line_dash)
+        self.assertEqual([2, 4], rd.throttle_lines[-1].glyph.line_dash)
+
 
     def test_get_fuel_map_html_table(self):
         d = Div()

@@ -9,7 +9,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import StatisticsError
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 import pandas as pd
 from pandas import DataFrame
@@ -87,10 +87,19 @@ def get_time_delta_dataframe_for_lap(lap: Lap, name: str) -> DataFrame:
 
 
 def calculate_time_diff_by_distance(
-        reference_lap: Lap, comparison_lap: Lap
+        reference_lap: Lap, comparison_lap: Lap, max_distance: Optional[float] = None
 ) -> DataFrame:
     df1 = get_time_delta_dataframe_for_lap(reference_lap, "reference")
     df2 = get_time_delta_dataframe_for_lap(comparison_lap, "comparison")
+
+    if max_distance is not None:
+        try:
+            numeric_max_distance = float(max_distance)
+        except (TypeError, ValueError):
+            numeric_max_distance = None
+        if numeric_max_distance is not None:
+            df1 = df1.loc[df1.index <= numeric_max_distance]
+            df2 = df2.loc[df2.index <= numeric_max_distance]
 
     df = df1.join(df2, how="outer").sort_index().interpolate()
 

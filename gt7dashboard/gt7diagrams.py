@@ -1,5 +1,5 @@
 import math
-from typing import List
+from typing import List, Optional, Union
 
 import bokeh
 from bokeh.events import MouseMove
@@ -210,9 +210,9 @@ class RaceDiagram(object):
         ]
         tooltips_timedelta = [
             ("Distance", "@distance{0} m"),
-            ("Last − Reference", "@timedelta{0} ms"),
+            ("Comparison − Reference", "@timedelta{0} ms"),
             ("Reference", "@reference{0} ms"),
-            ("Last", "@comparison{0} ms"),
+            ("Comparison", "@comparison{0} ms"),
         ]
         self.tooltips_speed_variance = [
             ("Distance", "@distance{0} m"),
@@ -383,6 +383,19 @@ class RaceDiagram(object):
         )
         self._register_renderer(
             self.source_last_lap, self.f_overview, overview_renderer
+        )
+        overview_reference_renderer = self.f_overview.line(
+            x="distance",
+            y="speed",
+            source=self.source_reference_lap,
+            line_width=2,
+            color="#a21caf",
+            line_dash="dashed",
+        )
+        self._register_renderer(
+            self.source_reference_lap,
+            self.f_overview,
+            overview_reference_renderer,
         )
         self.f_overview.yaxis.visible = False
         self.f_overview.ygrid.visible = False
@@ -608,10 +621,18 @@ class RaceDiagram(object):
         self.f_steering.y_range.reset_end = extent
 
     def add_additional_lap_to_race_diagram(
-        self, color: str, lap: Lap, visible: bool = True
+        self,
+        color: str,
+        lap: Lap,
+        visible: bool = True,
+        line_dash: Optional[Union[str, List[int]]] = None,
     ):
         source = self.add_lap_to_race_diagram(
-            color, lap.title, visible, additional=True
+            color,
+            lap.title,
+            visible,
+            additional=True,
+            line_dash=line_dash,
         )
         source.data = lap.get_data_dict()
         self.sources_additional_laps.append(source)
@@ -624,10 +645,16 @@ class RaceDiagram(object):
         return fastest_laps
 
     def add_lap_to_race_diagram(
-        self, color: str, legend: str, visible: bool = True, additional=False
+        self,
+        color: str,
+        legend: str,
+        visible: bool = True,
+        additional=False,
+        line_dash: Optional[Union[str, List[int]]] = None,
     ):
         source = ColumnDataSource(data=Lap().get_data_dict())
-        line_dash = self._line_dash_for_legend(legend)
+        if line_dash is None:
+            line_dash = self._line_dash_for_legend(legend)
 
         self._add_renderer(
             source,
