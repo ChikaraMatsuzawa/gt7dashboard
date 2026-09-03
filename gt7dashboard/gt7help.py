@@ -16,11 +16,9 @@ The list on the right hand side shows your best laps that are taken into conside
 HEADER = """The red or green button reflects the current connection status to Gran Turismo 7. i.e. if there was a packet received successfully in the last second, the button will turn green.
 
 Next is a brief description of the last and reference lap. The reference lap can be selected on the right side."""
-RACE_LINE_MINI = """This is a race line map with the last lap (blue) and the reference lap (magenta). Zoom in for more details.
+RACE_LINE_MINI = """This race line follows the distance selected in the analysis window. The large view automatically fits the selected section; the smaller view keeps the full course in context.
 
-This map is helpful if you are using the index number of a graph to quickly determine where in the lap a measurement was taken.
-
-See the tab 'Race Line' for a more detailed race line."""
+The last lap is blue and the reference lap is magenta."""
 MANUAL_CONTROLS = """'Log Lap Now' will log a lap now even if you have not crossed the finish line. This is helpful for missions or license tests where the end of a test is not necessarily identical with the finish line.
 
 The checkbox 'Record Replays' will allow you to record replays. Be careful since also background action before and after a time trial is counted as a replay. This is when a car drives on the track in the background of the menu.
@@ -29,15 +27,23 @@ In the 'Best Lap' dropdown list you can select the reference lap. Usually this w
 """
 
 TIME_DIFF = """This is a graph for showing the relative time difference between the last lap and the reference lap.
-Everything under the solid bar at 0 is slower than the reference lap. Everything above is faster than the reference lap.
+Values above zero mean the last lap is slower than the reference lap. Values below zero mean it is faster.
 
-If you see a bump in this graph to the top or the bottom this means that you were slower or faster at this point respectively.
+The value is calculated as Last minus Reference at the same distance around the track.
 """
 LAP_CONTROLS = """You can reset all laps with the 'Reset Laps' button. This is helpful if you are switching tracks or cars in a session. Otherwise the different tracks will mix in the dashboard.
 'Save Laps' will save your recorded laps to a file. You can load the laps afterwards with the dropdown list to the right."""
-SPEED_DIAGRAM = """The total speed of the laps selected. This value is in km/h. or mph. depending on your in-game setting"""
+LAP_LINE_STYLES = """Last lap is a blue solid line, reference lap is a magenta dashed line, and the median lap is a gray dotted line."""
+SPEED_DIAGRAM = """The total speed of the laps selected. This value is in km/h. or mph. depending on your in-game setting.
+
+""" + LAP_LINE_STYLES
 THROTTLE_DIAGRAM = """This is the amount of throttle pressure from 0% to 100% of the laps selected."""
 BRAKING_DIAGRAM = """This is the amount of braking pressure from 0% to 100% of the laps selected."""
+PEDAL_INPUTS_DIAGRAM = """Throttle and brake are shown together on the same 0% to 100% scale. Throttle is green and brake is red. Solid lines are the last lap and dashed lines are the reference lap. These fixed colors and line styles replace a separate legend."""
+STEERING_DIAGRAM = """The mean of the front-left and front-right wheel steering angles, shown in degrees. This data is available when laps are recorded with packet format C. The chart starts at a symmetric ±10° scale and expands in 5° steps when needed.
+
+""" + LAP_LINE_STYLES
+ANALYSIS_WINDOW = """Select a section of the lap by distance. Drag the highlighted region to move it, drag either edge to resize it, or choose a distance preset."""
 COASTING_DIAGRAM = """This is the amount of coasting from 0% to 100% of the laps selected. Coasting is when neither throttle nor brake are engaged."""
 GEAR_DIAGRAM = """This is the current gear of the laps selected."""
 RPM_DIAGRAM = "This is the current RPM of the laps selected."

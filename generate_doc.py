@@ -33,6 +33,9 @@ if __name__ == '__main__':
     out_markdown += add_screenshot("screenshot_manualcontrols.png") + "\n\n"
     out_markdown += gt7help.MANUAL_CONTROLS + "\n\n"
 
+    out_markdown += "#### Analysis Window\n\n"
+    out_markdown += gt7help.ANALYSIS_WINDOW + "\n\n"
+
     out_markdown += "#### Speed \n\n"
     out_markdown += add_screenshot("screenshot_speed.png") + "\n\n"
     out_markdown += gt7help.SPEED_DIAGRAM + "\n\n"
@@ -53,18 +56,16 @@ if __name__ == '__main__':
 On two different episodes of this podcast both [Peter Krause](https://www.yourdatadriven.com/ep12-go-faster-now-with-motorsports-data-analytics-guru-peter-krause/) and [Ross Bentley](https://www.yourdatadriven.com/ep3-tips-for-racing-faster-with-ross-bentley/) mentioned this visualization.
 If they had one graph it would be the deviation in the (best) laps of the same driver, to improve said drivers performance learning from the differences in already good laps. If they could do it once, they could do it every time.\n\n"""
 
-    out_markdown += "#### Throttle\n\n"
-    out_markdown += add_screenshot("screenshot_throttle.png") + "\n\n"
-    out_markdown += gt7help.THROTTLE_DIAGRAM + "\n\n"
+    out_markdown += "#### Pedal Inputs\n\n"
+    out_markdown += gt7help.PEDAL_INPUTS_DIAGRAM + "\n\n"
 
     out_markdown += "#### Yaw Rate / Second\n\n"
     out_markdown += add_screenshot("screenshot_yaw.png") + "\n\n"
     out_markdown += gt7help.YAW_RATE_DIAGRAM + "\n\n"
     out_markdown += "[Suellio Almeida](https://suellioalmeida.ca) introduced this concept to me. See [here](https://www.youtube.com/watch?v=B92vFKKjyB0) for more information.\n\n"
 
-    out_markdown += "#### Braking\n\n"
-    out_markdown += add_screenshot("screenshot_braking.png") + "\n\n"
-    out_markdown += gt7help.BRAKING_DIAGRAM + "\n\n"
+    out_markdown += "#### Steering Angle\n\n"
+    out_markdown += gt7help.STEERING_DIAGRAM + "\n\n"
 
     out_markdown += "#### Coasting\n\n"
     out_markdown += add_screenshot("screenshot_coasting.png") + "\n\n"

@@ -11,14 +11,16 @@ See the [Manual](#manual) for detailed instructions.
 
 * Time Diff Graph between Last Lap and Reference Lap
   * *Under dashed line* is better and *over dashed line* is worse than Reference Lap
-* Race Line view with speed peaks and valleys of last lap and reference lap
+* Distance-based analysis window with 100 m, 250 m, 500 m, 1,000 m and full-lap presets
+  * Drag the selected range in the full-lap overview to move or resize every linked graph
+* Linked Race Line detail that enlarges the selected distance, plus a full-course context view
 * Speed/Distance Graph for Last Lap, Reference Lap and Median Lap
   * Median Lap is calculated by the median of all recent laps
 * Speed Variance Graph showing speed deviation in your best laps
 * Picker for Reference Lap
   * Default is Best Lap
-* Throttle/Distance Graph
-* Braking/Distance Graph
+* Combined Throttle and Braking graph on the same 0% to 100% axis
+* Front-wheel steering angle graph for packet format C laps
 * Coasting/Distance Graph
 * Race Line Graph
 * Table of Speed Peaks and Valleys. Compared between reference and last lap
@@ -165,9 +167,9 @@ You can reset all laps with the 'Reset Laps' button. This is helpful if you are 
 ![screenshot_header](README.assets/screenshot_timediff.png)
 
 This is a graph for showing the relative time difference between the last lap and the reference lap.
-Everything under the solid bar at 0 is slower than the reference lap. Everything above is faster than the reference lap.
+Values above zero mean the last lap is slower than the reference lap. Values below zero mean it is faster.
 
-If you see a bump in this graph to the top or the bottom this means that you were slower or faster at this point respectively.
+The value is calculated as Last minus Reference at the same distance around the track.
 
 
 #### Manual Controls
@@ -180,22 +182,24 @@ The checkbox 'Record Replays' will allow you to record replays. Be careful since
 
 In the 'Best Lap' dropdown list you can select the reference lap. Usually this will point to the best lap of the session.
 
+#### Analysis Window
+
+Select a section of the lap by distance. Drag the highlighted region to move it, drag either edge to resize it, or choose a distance preset.
+
 
 #### Speed 
 
 ![screenshot_header](README.assets/screenshot_speed.png)
 
-The total speed of the laps selected. This value is in km/h. or mph. depending on your in-game setting
+The total speed of the laps selected. This value is in km/h. or mph. depending on your in-game setting. Last lap is a blue solid line, reference lap is a magenta dashed line, and the median lap is a gray dotted line.
 
 #### Race Line
 
 ![screenshot_header](README.assets/screenshot_raceline.png)
 
-This is a race line map with the last lap (blue) and the reference lap (magenta). Zoom in for more details.
+This race line follows the distance selected in the analysis window. The large view automatically fits the selected section; the smaller view keeps the full course in context.
 
-This map is helpful if you are using the index number of a graph to quickly determine where in the lap a measurement was taken.
-
-See the tab 'Race Line' for a more detailed race line.
+The last lap is blue and the reference lap is magenta.
 
 #### Peaks and Valleys
 
@@ -222,11 +226,9 @@ I got inspired for this diagram by the [Your Data Driven Podcast](https://www.yo
 On two different episodes of this podcast both [Peter Krause](https://www.yourdatadriven.com/ep12-go-faster-now-with-motorsports-data-analytics-guru-peter-krause/) and [Ross Bentley](https://www.yourdatadriven.com/ep3-tips-for-racing-faster-with-ross-bentley/) mentioned this visualization.
 If they had one graph it would be the deviation in the (best) laps of the same driver, to improve said drivers performance learning from the differences in already good laps. If they could do it once, they could do it every time.
 
-#### Throttle
+#### Pedal Inputs
 
-![screenshot_header](README.assets/screenshot_throttle.png)
-
-This is the amount of throttle pressure from 0% to 100% of the laps selected.
+Throttle and brake are shown together on the same 0% to 100% scale. Throttle is green and brake is red. Solid lines are the last lap and dashed lines are the reference lap; these fixed styles replace a separate legend.
 
 #### Yaw Rate / Second
 
@@ -236,11 +238,9 @@ This is the yaw rate per second of your car. Use this to determine the Maximum R
 
 [Suellio Almeida](https://suellioalmeida.ca) introduced this concept to me. See [here](https://www.youtube.com/watch?v=B92vFKKjyB0) for more information.
 
-#### Braking
+#### Steering Angle
 
-![screenshot_header](README.assets/screenshot_braking.png)
-
-This is the amount of braking pressure from 0% to 100% of the laps selected.
+The mean of the front-left and front-right wheel steering angles is shown in degrees. This data is available when laps are recorded with packet format C. The chart starts at a symmetric ±10° scale and expands in 5° steps when needed. Last lap is a blue solid line and reference lap is a magenta dashed line.
 
 #### Coasting
 

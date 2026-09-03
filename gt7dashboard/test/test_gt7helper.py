@@ -11,6 +11,21 @@ from gt7dashboard import gt7lap
 
 
 class TestHelper(unittest.TestCase):
+    def test_lap_steering_angle_is_aligned_and_converted_to_degrees(self):
+        lap = Lap()
+        lap.data_speed = [100, 110, 120, 130]
+        lap.data_front_left_steering_angle_rad = [0.1, None, 0.2]
+        lap.data_front_right_steering_angle_rad = [0.3, 0.4, None]
+
+        steering = lap.get_data_dict()["steering_angle"]
+
+        self.assertEqual(4, len(steering))
+        self.assertAlmostEqual(11.4592, steering[0], places=3)
+        self.assertAlmostEqual(22.9183, steering[1], places=3)
+        self.assertAlmostEqual(11.4592, steering[2], places=3)
+        self.assertIsNone(steering[3])
+        self.assertTrue(lap.has_steering_angle_data())
+
     def test_calculate_remaining_fuel(self):
         fuel_consumed_per_lap, laps_remaining, time_remaining = calculate_remaining_fuel(100, 80, 10000)
         self.assertEqual(fuel_consumed_per_lap, 20)

@@ -1,8 +1,24 @@
+import math
 from typing import List
 
 import bokeh
-from bokeh.layouts import layout
-from bokeh.models import ColumnDataSource, Label, Scatter, Column, Line, TableColumn, DataTable, Range1d
+from bokeh.events import MouseMove
+from bokeh.layouts import column, row
+from bokeh.models import (
+    Column,
+    ColumnDataSource,
+    CrosshairTool,
+    CustomJS,
+    DataTable,
+    Div,
+    Label,
+    Line,
+    Range1d,
+    RangeTool,
+    Scatter,
+    Select,
+    TableColumn,
+)
 from bokeh.plotting import figure
 
 from gt7dashboard import gt7helper
@@ -13,7 +29,6 @@ def get_throttle_braking_race_line_diagram():
     # TODO Make this work, tooltips just show breakpoint
     race_line_tooltips = [("index", "$index")]
     s_race_line = figure(
-        title="Race Line",
         match_aspect=True,
         active_scroll="wheel_zoom",
         tooltips=race_line_tooltips,
@@ -24,6 +39,7 @@ def get_throttle_braking_race_line_diagram():
     s_race_line.y_range.flipped = True
 
     s_race_line.toolbar.autohide = True
+    s_race_line.title.visible = False
 
     s_race_line.axis.visible = False
     s_race_line.xgrid.visible = False
@@ -32,7 +48,6 @@ def get_throttle_braking_race_line_diagram():
     throttle_line = s_race_line.line(
         x="raceline_x_throttle",
         y="raceline_z_throttle",
-        legend_label="Throttle Last Lap",
         line_width=5,
         color="green",
         source=ColumnDataSource(
@@ -42,7 +57,6 @@ def get_throttle_braking_race_line_diagram():
     breaking_line = s_race_line.line(
         x="raceline_x_braking",
         y="raceline_z_braking",
-        legend_label="Braking Last Lap",
         line_width=5,
         color="red",
         source=ColumnDataSource(
@@ -53,7 +67,6 @@ def get_throttle_braking_race_line_diagram():
     coasting_line = s_race_line.line(
         x="raceline_x_coasting",
         y="raceline_z_coasting",
-        legend_label="Coasting Last Lap",
         line_width=5,
         color="blue",
         source=ColumnDataSource(
@@ -66,7 +79,6 @@ def get_throttle_braking_race_line_diagram():
     reference_throttle_line = s_race_line.line(
         x="raceline_x_throttle",
         y="raceline_z_throttle",
-        legend_label="Throttle Reference",
         line_width=15,
         alpha=0.3,
         color="green",
@@ -77,7 +89,6 @@ def get_throttle_braking_race_line_diagram():
     reference_breaking_line = s_race_line.line(
         x="raceline_x_braking",
         y="raceline_z_braking",
-        legend_label="Braking Reference",
         line_width=15,
         alpha=0.3,
         color="red",
@@ -89,7 +100,6 @@ def get_throttle_braking_race_line_diagram():
     reference_coasting_line = s_race_line.line(
         x="raceline_x_coasting",
         y="raceline_z_coasting",
-        legend_label="Coasting Reference",
         line_width=15,
         alpha=0.3,
         color="blue",
@@ -97,12 +107,6 @@ def get_throttle_braking_race_line_diagram():
             data={"raceline_z_coasting": [], "raceline_x_coasting": []}
         ),
     )
-
-    s_race_line.legend.visible = True
-
-    s_race_line.add_layout(s_race_line.legend[0], "right")
-
-    s_race_line.legend.click_policy = "hide"
 
     return (
         s_race_line,
@@ -154,167 +158,169 @@ class RaceTimeTable(object):
         self.lap_times_source.data = ColumnDataSource.from_df(new_df)
 
 class RaceDiagram(object):
-    def __init__(self, width=400):
-        """
-        Returns figures for time-diff, speed, throttling, braking and coasting.
-        All with lines for last lap, best lap and median lap.
-        The last return value is the sources object, that has to be altered
-        to display data.
-        """
+    DEFAULT_WINDOW_METERS = 250
+    STEERING_DEFAULT_EXTENT_DEGREES = 10
+    STEERING_RANGE_STEP_DEGREES = 5
+    STEERING_RANGE_HEADROOM = 1.1
+    WINDOW_OPTIONS = [
+        ("100", "100 m"),
+        ("250", "250 m"),
+        ("500", "500 m"),
+        ("1000", "1,000 m"),
+        ("full", "Full lap"),
+    ]
 
+    def __init__(self, width=400):
+        """Build the linked distance-based telemetry plots."""
         self.speed_lines = []
         self.braking_lines = []
         self.coasting_lines = []
         self.throttle_lines = []
+        self.steering_lines = []
         self.tires_lines = []
         self.rpm_lines = []
         self.gears_lines = []
         self.boost_lines = []
         self.yaw_rate_lines = []
 
-        # Data Sources
         self.source_time_diff = None
         self.source_speed_variance = None
         self.source_last_lap = None
         self.source_reference_lap = None
         self.source_median_lap = None
         self.sources_additional_laps = []
+        self._renderer_groups = {}
+        self._additional_source_ids = []
+        self._lap_distance_max = 0.0
 
-        self.additional_laps = List[Lap]
-
-        # This is the number of default laps,
-        # last lap, best lap and median lap
+        self.additional_laps = []
         self.number_of_default_laps = 3
 
-
         tooltips = [
-            ("index", "$index"),
-            ("value", "$y"),
-            ("Speed", "@speed{0}"),
+            ("Distance", "@distance{0} m"),
+            ("Speed", "@speed{0} km/h"),
+            ("Throttle", "@throttle{0}%"),
+            ("Brake", "@brake{0}%"),
+            ("Coast", "@coast{0}%"),
+            ("Steering", "@steering_angle{0.0}°"),
             ("Yaw Rate", "@yaw_rate{0.00}"),
-            ("Throttle", "@throttle%"),
-            ("Brake", "@brake%"),
-            ("Coast", "@coast%"),
             ("Gear", "@gear"),
             ("Rev", "@rpm{0} RPM"),
-            ("Distance", "@distance{0} m"),
             ("Boost", "@boost{0.00} x 100 kPa"),
         ]
-
         tooltips_timedelta = [
-            ("index", "$index"),
-            ("timedelta", "@timedelta{0} ms"),
-            ("reference", "@reference{0} ms"),
-            ("comparison", "@comparison{0} ms"),
+            ("Distance", "@distance{0} m"),
+            ("Last − Reference", "@timedelta{0} ms"),
+            ("Reference", "@reference{0} ms"),
+            ("Last", "@comparison{0} ms"),
         ]
-
         self.tooltips_speed_variance = [
-            ("index", "$index"),
             ("Distance", "@distance{0} m"),
             ("Spd. Deviation", "@speed_variance{0}"),
         ]
 
-        self.f_speed = figure(
-            title="Last, Reference, Median",
-            y_axis_label="Speed",
-            width=width,
-            height=250,
-            tooltips=tooltips,
-            active_drag="box_zoom",
+        # The selected range is always expressed in metres. All telemetry plots
+        # share this exact object, so a RangeTool interaction updates them as one.
+        self.analysis_range = Range1d(
+            start=0,
+            end=self.DEFAULT_WINDOW_METERS,
+            bounds=(0, None),
+        )
+        self.full_lap_range = Range1d(start=0, end=1000, bounds=(0, None))
+
+        def telemetry_figure(y_axis_label, height, y_range=None, tooltips_override=None):
+            figure_options = dict(
+                y_axis_label=y_axis_label,
+                x_range=self.analysis_range,
+                width=width,
+                height=height,
+                sizing_mode="stretch_width",
+                tooltips=tooltips_override or tooltips,
+                active_drag="box_zoom",
+            )
+            if y_range is not None:
+                figure_options["y_range"] = y_range
+            return figure(**figure_options)
+
+        self.f_time_diff = telemetry_figure(
+            "Delta (ms)",
+            110,
+            tooltips_override=tooltips_timedelta,
+        )
+        self.f_speed = telemetry_figure("Speed (km/h)", 225)
+        self.f_pedal_inputs = telemetry_figure(
+            "Input (%)",
+            195,
+            y_range=Range1d(0, 100),
+        )
+        # Compatibility aliases for integrations that still refer to the old
+        # separate figures. Both now intentionally point at the combined plot.
+        self.f_throttle = self.f_pedal_inputs
+        self.f_braking = self.f_pedal_inputs
+        self.f_steering = telemetry_figure(
+            "Angle (deg)",
+            140,
+            y_range=Range1d(
+                -self.STEERING_DEFAULT_EXTENT_DEGREES,
+                self.STEERING_DEFAULT_EXTENT_DEGREES,
+            ),
         )
 
-        self.f_speed_variance = figure(
-            y_axis_label="Spd.Dev.",
-            x_range=self.f_speed.x_range,
+        self.f_speed_variance = telemetry_figure(
+            "Spd. Dev.",
+            150,
             y_range=Range1d(0, 50),
-            width=width,
-            height=int(self.f_speed.height / 4),
-            tooltips=self.tooltips_speed_variance,
-            active_drag="box_zoom",
+            tooltips_override=self.tooltips_speed_variance,
         )
+        self.f_coasting = telemetry_figure(
+            "Coasting (%)", 150, y_range=Range1d(0, 100)
+        )
+        self.f_tires = telemetry_figure("Ratio", 160)
+        self.f_rpm = telemetry_figure("RPM", 160)
+        self.f_gear = telemetry_figure("Gear", 130)
+        self.f_boost = telemetry_figure("Boost", 150)
+        self.f_yaw_rate = telemetry_figure("Yaw Rate / Second", 160)
 
-        self.f_time_diff = figure(
-            title="Time Diff - Last, Reference",
-            x_range=self.f_speed.x_range,
-            y_axis_label="Time / Diff",
-            width=width,
-            height=int(self.f_speed.height / 2),
-            tooltips=tooltips_timedelta,
-            active_drag="box_zoom",
-        )
+        all_figures = [
+            self.f_time_diff,
+            self.f_speed,
+            self.f_pedal_inputs,
+            self.f_steering,
+            self.f_speed_variance,
+            self.f_coasting,
+            self.f_tires,
+            self.f_rpm,
+            self.f_gear,
+            self.f_boost,
+            self.f_yaw_rate,
+        ]
+        for telemetry_plot in all_figures:
+            telemetry_plot.toolbar.autohide = True
+            telemetry_plot.min_border_left = 65
+            telemetry_plot.min_border_top = 2
+            telemetry_plot.min_border_bottom = 8
+            telemetry_plot.title.visible = False
+            telemetry_plot.xaxis.axis_label = None
 
-        self.f_throttle = figure(
-            x_range=self.f_speed.x_range,
-            y_axis_label="Throttle",
-            width=width,
-            height=int(self.f_speed.height / 2),
-            tooltips=tooltips,
-            active_drag="box_zoom",
-        )
-        self.f_braking = figure(
-            x_range=self.f_speed.x_range,
-            y_axis_label="Braking",
-            width=width,
-            height=int(self.f_speed.height / 2),
-            tooltips=tooltips,
-            active_drag="box_zoom",
-        )
+        # The primary graphs share a single visible distance scale at the
+        # bottom of the stack. Auxiliary-tab graphs retain ticks because they
+        # are viewed one at a time.
+        for telemetry_plot in [
+            self.f_time_diff,
+            self.f_speed,
+            self.f_pedal_inputs,
+        ]:
+            telemetry_plot.xaxis.visible = False
+            telemetry_plot.min_border_bottom = 2
 
-        self.f_coasting = figure(
-            x_range=self.f_speed.x_range,
-            y_axis_label="Coasting",
-            width=width,
-            height=int(self.f_speed.height / 2),
-            tooltips=tooltips,
-            active_drag="box_zoom",
+        # Keep one shared vertical cursor across all of the numeric plots.
+        self.shared_crosshair = bokeh.models.Span(
+            dimension="height", line_color="#6b7280", line_alpha=0.65, line_width=1
         )
-
-        self.f_tires = figure(
-            x_range=self.f_speed.x_range,
-            y_axis_label="Tire Spd / Car Spd",
-            width=width,
-            height=int(self.f_speed.height / 2),
-            tooltips=tooltips,
-            active_drag="box_zoom",
-        )
-
-        self.f_rpm = figure(
-            x_range=self.f_speed.x_range,
-            y_axis_label="RPM",
-            width=width,
-            height=int(self.f_speed.height / 2),
-            tooltips=tooltips,
-            active_drag="box_zoom",
-        )
-
-        self.f_gear = figure(
-            x_range=self.f_speed.x_range,
-            y_axis_label="Gear",
-            width=width,
-            height=int(self.f_speed.height / 2),
-            tooltips=tooltips,
-            active_drag="box_zoom",
-        )
-
-        self.f_boost = figure(
-            x_range=self.f_speed.x_range,
-            y_axis_label="Boost",
-            width=width,
-            height=int(self.f_speed.height / 2),
-            tooltips=tooltips,
-            active_drag="box_zoom",
-        )
-
-        self.f_yaw_rate = figure(
-            x_range=self.f_speed.x_range,
-            y_axis_label="Yaw Rate / Second",
-            width=width,
-            height=int(self.f_speed.height / 2),
-            tooltips=tooltips,
-            active_drag="box_zoom",
-        )
-
-        self.f_speed.toolbar.autohide = True
+        for telemetry_plot in all_figures:
+            telemetry_plot.add_tools(
+                CrosshairTool(dimensions="height", overlay=self.shared_crosshair)
+            )
 
         span_zero_time_diff = bokeh.models.Span(
             location=0,
@@ -325,234 +331,786 @@ class RaceDiagram(object):
         )
         self.f_time_diff.add_layout(span_zero_time_diff)
 
-        self.f_time_diff.toolbar.autohide = True
-
-        self.f_speed_variance.xaxis.visible = False
-        self.f_speed_variance.toolbar.autohide = True
-
-        self.f_throttle.xaxis.visible = False
-        self.f_throttle.toolbar.autohide = True
-
-        self.f_braking.xaxis.visible = False
-        self.f_braking.toolbar.autohide = True
-
-        self.f_coasting.xaxis.visible = False
-        self.f_coasting.toolbar.autohide = True
-
-        self.f_tires.xaxis.visible = False
-        self.f_tires.toolbar.autohide = True
-
-        self.f_gear.xaxis.visible = False
-        self.f_gear.toolbar.autohide = True
-
-        self.f_rpm.xaxis.visible = False
-        self.f_rpm.toolbar.autohide = True
-
-        self.f_boost.xaxis.visible = False
-        self.f_boost.toolbar.autohide = True
-
-        self.f_yaw_rate.xaxis.visible = False
-        self.f_yaw_rate.toolbar.autohide = True
-
-        self.source_time_diff = ColumnDataSource(data={"distance": [], "timedelta": []})
+        self.source_time_diff = ColumnDataSource(
+            data={"distance": [], "timedelta": [], "reference": [], "comparison": []}
+        )
         self.f_time_diff.line(
             x="distance",
             y="timedelta",
             source=self.source_time_diff,
-            line_width=1,
-            color="blue",
+            line_width=2,
+            color="#2563eb",
             line_alpha=1,
         )
 
-        self.source_last_lap = self.add_lap_to_race_diagram("blue", "Last Lap", True)
+        self.source_last_lap = self.add_lap_to_race_diagram(
+            "#2563eb", "Last Lap", True
+        )
+        self.source_reference_lap = self.add_lap_to_race_diagram(
+            "#a21caf", "Reference Lap", True
+        )
+        self.source_median_lap = self.add_lap_to_race_diagram(
+            "#64748b", "Median Lap", False
+        )
 
-        self.source_reference_lap = self.add_lap_to_race_diagram("magenta", "Reference Lap", True)
-
-        self.source_median_lap = self.add_lap_to_race_diagram("green", "Median Lap", False)
-
-        self.f_speed.legend.click_policy = "hide"
-        self.f_throttle.legend.click_policy = self.f_speed.legend.click_policy
-        self.f_braking.legend.click_policy = self.f_speed.legend.click_policy
-        self.f_coasting.legend.click_policy = self.f_speed.legend.click_policy
-        self.f_tires.legend.click_policy = self.f_speed.legend.click_policy
-        self.f_gear.legend.click_policy = self.f_speed.legend.click_policy
-        self.f_rpm.legend.click_policy = self.f_speed.legend.click_policy
-        self.f_boost.legend.click_policy = self.f_speed.legend.click_policy
-        self.f_yaw_rate.legend.click_policy = self.f_speed.legend.click_policy
-
-        # Leave padding on the left because rpm is 4 digits and diagrams will not start at the same position otherwise
-        min_border_left = 60
-        self.f_time_diff.min_border_left = min_border_left
-        self.f_speed.min_border_left = min_border_left
-        self.f_throttle.min_border_left = min_border_left
-        self.f_braking.min_border_left = min_border_left
-        self.f_coasting.min_border_left = min_border_left
-        self.f_tires.min_border_left = min_border_left
-        self.f_gear.min_border_left = min_border_left
-        self.f_rpm.min_border_left = min_border_left
-        self.f_speed_variance.min_border_left = min_border_left
-        self.f_boost.min_border_left = min_border_left
-        self.f_yaw_rate.min_border_left = min_border_left
-
-        self.layout = layout(self.f_time_diff, self.f_speed, self.f_speed_variance, self.f_throttle, self.f_yaw_rate, self.f_braking, self.f_coasting, self.f_tires, self.f_gear, self.f_rpm, self.f_boost)
-
-        self.source_speed_variance = ColumnDataSource(data={"distance": [], "speed_variance": []})
-
+        self.source_speed_variance = ColumnDataSource(
+            data={"distance": [], "speed_variance": []}
+        )
         self.f_speed_variance.line(
             x="distance",
             y="speed_variance",
             source=self.source_speed_variance,
-            line_width=1,
-            color="gray",
+            line_width=2,
+            color="#64748b",
             line_alpha=1,
-            visible=True
+            visible=True,
         )
 
-    def add_additional_lap_to_race_diagram(self, color: str, lap: Lap, visible: bool = True):
-        source = self.add_lap_to_race_diagram(color, lap.title, visible)
+        self.f_overview = figure(
+            x_range=self.full_lap_range,
+            width=width,
+            height=100,
+            sizing_mode="stretch_width",
+            toolbar_location=None,
+            tools="",
+        )
+        overview_renderer = self.f_overview.line(
+            x="distance",
+            y="speed",
+            source=self.source_last_lap,
+            line_width=2,
+            color="#2563eb",
+        )
+        self._register_renderer(
+            self.source_last_lap, self.f_overview, overview_renderer
+        )
+        self.f_overview.yaxis.visible = False
+        self.f_overview.ygrid.visible = False
+        self.f_overview.min_border_left = 65
+        self.f_overview.min_border_top = 2
+        self.f_overview.min_border_bottom = 8
+        self.f_overview.title.visible = False
+        self.f_overview.xaxis.axis_label = None
+
+        self.range_tool = RangeTool(x_range=self.analysis_range)
+        self.range_tool.overlay.fill_color = "#2563eb"
+        self.range_tool.overlay.fill_alpha = 0.18
+        self.f_overview.add_tools(self.range_tool)
+
+        self.window_select = Select(
+            title="Analysis window",
+            value=str(self.DEFAULT_WINDOW_METERS),
+            options=self.WINDOW_OPTIONS,
+            width=150,
+        )
+        self.window_label = Div(text="0–250 m · 250 m window", width=300)
+        self.window_select.on_change("value", self._on_window_size_change)
+        label_callback = CustomJS(
+            args=dict(selected_range=self.analysis_range, label=self.window_label),
+            code="""
+                const start = Math.max(0, Number(selected_range.start) || 0)
+                const end = Math.max(start, Number(selected_range.end) || start)
+                const roundedStart = Math.round(start).toLocaleString()
+                const roundedEnd = Math.round(end).toLocaleString()
+                const width = Math.round(end - start).toLocaleString()
+                label.text = `${roundedStart}–${roundedEnd} m · ${width} m window`
+            """,
+        )
+        self.analysis_range.js_on_change("start", label_callback)
+        self.analysis_range.js_on_change("end", label_callback)
+
+        self.steering_empty_state = Div(
+            text=(
+                "<div style='padding:28px 16px;text-align:center;color:#64748b;'>"
+                "Steering angle is unavailable for these laps. Record with packet format C."
+                "</div>"
+            ),
+            visible=True,
+            height=90,
+            sizing_mode="stretch_width",
+        )
+        self.f_steering.visible = False
+        self.steering_view = column(
+            self.f_steering,
+            self.steering_empty_state,
+            sizing_mode="stretch_width",
+        )
+
+        self.navigator_layout = column(
+            row(self.window_select, self.window_label, sizing_mode="stretch_width"),
+            self.f_overview,
+            sizing_mode="stretch_width",
+            spacing=4,
+        )
+        self.primary_layout = column(
+            self.navigator_layout,
+            self.f_time_diff,
+            self.f_speed,
+            self.f_pedal_inputs,
+            self.steering_view,
+            sizing_mode="stretch_width",
+            spacing=4,
+        )
+        self.secondary_layout = column(
+            self.f_speed_variance,
+            self.f_yaw_rate,
+            self.f_coasting,
+            self.f_gear,
+            self.f_rpm,
+            self.f_boost,
+            self.f_tires,
+            sizing_mode="stretch_width",
+            spacing=4,
+        )
+        self.layout = column(
+            self.primary_layout,
+            self.secondary_layout,
+            sizing_mode="stretch_width",
+            spacing=8,
+        )
+
+    @staticmethod
+    def _line_dash_for_legend(legend):
+        if legend == "Reference Lap":
+            return "dashed"
+        if legend == "Median Lap":
+            return "dotted"
+        if legend == "Last Lap":
+            return "solid"
+        return "dotdash"
+
+    def _register_renderer(self, source, telemetry_plot, renderer):
+        self._renderer_groups.setdefault(source.id, []).append(
+            (telemetry_plot, renderer)
+        )
+
+    def _add_renderer(self, source, telemetry_plot, collection, **kwargs):
+        renderer = telemetry_plot.line(source=source, **kwargs)
+        collection.append(renderer)
+        self._register_renderer(source, telemetry_plot, renderer)
+        return renderer
+
+    def _on_window_size_change(self, attr, old, new):
+        if new == "full":
+            requested_width = self._lap_distance_max
+        else:
+            requested_width = float(new)
+
+        if self._lap_distance_max <= 0:
+            return
+
+        requested_width = min(requested_width, self._lap_distance_max)
+        center = (self.analysis_range.start + self.analysis_range.end) / 2
+        start = max(0, center - requested_width / 2)
+        end = min(self._lap_distance_max, start + requested_width)
+        start = max(0, end - requested_width)
+        self._set_analysis_range(start, end)
+
+    def _set_analysis_range(self, start, end):
+        self.analysis_range.start = start
+        self.analysis_range.end = end
+        self.analysis_range.reset_start = start
+        self.analysis_range.reset_end = end
+        self._update_window_label()
+
+    def _update_window_label(self):
+        start = max(0, float(self.analysis_range.start or 0))
+        end = max(start, float(self.analysis_range.end or start))
+        self.window_label.text = (
+            f"{start:,.0f}–{end:,.0f} m · {end - start:,.0f} m window"
+        )
+
+    def update_analysis_domain(self, distances):
+        valid_distances = []
+        for distance in distances:
+            try:
+                numeric_distance = float(distance)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(numeric_distance) and numeric_distance >= 0:
+                valid_distances.append(numeric_distance)
+        if not valid_distances:
+            return
+
+        previous_max = self._lap_distance_max
+        previous_width = self.analysis_range.end - self.analysis_range.start
+        was_full_lap = previous_max > 0 and previous_width >= previous_max - 1
+        self._lap_distance_max = max(valid_distances)
+
+        self.full_lap_range.bounds = (0, self._lap_distance_max)
+        self.analysis_range.bounds = (0, self._lap_distance_max)
+        self.full_lap_range.start = 0
+        self.full_lap_range.end = self._lap_distance_max
+        self.full_lap_range.reset_start = 0
+        self.full_lap_range.reset_end = self._lap_distance_max
+
+        if previous_max <= 0:
+            requested_width = min(
+                self.DEFAULT_WINDOW_METERS, self._lap_distance_max
+            )
+            self._set_analysis_range(0, requested_width)
+        elif was_full_lap or self.window_select.value == "full":
+            self._set_analysis_range(0, self._lap_distance_max)
+        else:
+            requested_width = min(previous_width, self._lap_distance_max)
+            start = min(self.analysis_range.start, self._lap_distance_max - requested_width)
+            self._set_analysis_range(max(0, start), max(0, start) + requested_width)
+
+    def clear_analysis_domain(self):
+        self._lap_distance_max = 0.0
+        self.full_lap_range.bounds = (0, None)
+        self.analysis_range.bounds = (0, None)
+        self.full_lap_range.start = 0
+        self.full_lap_range.end = 1000
+        self.full_lap_range.reset_start = 0
+        self.full_lap_range.reset_end = 1000
+        self.window_select.value = str(self.DEFAULT_WINDOW_METERS)
+        self._set_analysis_range(0, self.DEFAULT_WINDOW_METERS)
+
+    def update_steering_visibility(self):
+        sources = [
+            self.source_last_lap,
+            self.source_reference_lap,
+            *self.sources_additional_laps,
+        ]
+        steering_values = []
+        for source in sources:
+            if source is None:
+                continue
+            for value in source.data.get("steering_angle", []):
+                try:
+                    numeric_value = float(value)
+                except (TypeError, ValueError):
+                    continue
+                if math.isfinite(numeric_value):
+                    steering_values.append(numeric_value)
+
+        self.f_steering.visible = bool(steering_values)
+        self.steering_empty_state.visible = not steering_values
+        self._update_steering_range(steering_values)
+
+    def _update_steering_range(self, steering_values):
+        """Keep a compact symmetric steering scale without clipping real data."""
+        maximum_observed_extent = max(
+            (abs(value) for value in steering_values), default=0
+        )
+        required_extent = max(
+            self.STEERING_DEFAULT_EXTENT_DEGREES,
+            maximum_observed_extent * self.STEERING_RANGE_HEADROOM,
+        )
+        extent = math.ceil(
+            required_extent / self.STEERING_RANGE_STEP_DEGREES
+        ) * self.STEERING_RANGE_STEP_DEGREES
+
+        self.f_steering.y_range.start = -extent
+        self.f_steering.y_range.end = extent
+        self.f_steering.y_range.reset_start = -extent
+        self.f_steering.y_range.reset_end = extent
+
+    def add_additional_lap_to_race_diagram(
+        self, color: str, lap: Lap, visible: bool = True
+    ):
+        source = self.add_lap_to_race_diagram(
+            color, lap.title, visible, additional=True
+        )
         source.data = lap.get_data_dict()
         self.sources_additional_laps.append(source)
+        self.update_steering_visibility()
+        return source
 
     def update_fastest_laps_variance(self, laps):
-        # FIXME, many many data points, mayabe reduce by the amount of laps?
         variance, fastest_laps = gt7helper.get_variance_for_fastest_laps(laps)
         self.source_speed_variance.data = variance
         return fastest_laps
 
-    def add_lap_to_race_diagram(self, color: str, legend: str, visible: bool = True):
+    def add_lap_to_race_diagram(
+        self, color: str, legend: str, visible: bool = True, additional=False
+    ):
+        source = ColumnDataSource(data=Lap().get_data_dict())
+        line_dash = self._line_dash_for_legend(legend)
 
-        # Set empty data for avoiding warnings about missing columns
-        dummy_data = Lap().get_data_dict()
-
-        source = ColumnDataSource(data=dummy_data)
-
-        self.speed_lines.append(self.f_speed.line(
+        self._add_renderer(
+            source,
+            self.f_speed,
+            self.speed_lines,
             x="distance",
             y="speed",
-            source=source,
-            legend_label=legend,
-            line_width=1,
-            color=color,
-            line_alpha=1,
-            visible=visible
-        ))
-
-        self.throttle_lines.append(self.f_throttle.line(
+            line_width=2,
+            line_color=color,
+            line_dash=line_dash,
+            line_alpha=0.95,
+            visible=visible,
+        )
+        throttle_options = dict(
             x="distance",
             y="throttle",
-            source=source,
-            legend_label=legend,
-            line_width=1,
-            color=color,
-            line_alpha=1,
-            visible=visible
-        ))
-
-        self.braking_lines.append(self.f_braking.line(
+            line_width=2,
+            line_color="#16a34a",
+            line_dash=line_dash,
+            line_alpha=0.9,
+            visible=visible,
+        )
+        brake_options = dict(
             x="distance",
             y="brake",
-            source=source,
-            legend_label=legend,
-            line_width=1,
-            color=color,
-            line_alpha=1,
-            visible=visible
-        ))
-
-        self.coasting_lines.append(self.f_coasting.line(
+            line_width=2,
+            line_color="#dc2626",
+            line_dash=line_dash,
+            line_alpha=0.9,
+            visible=visible,
+        )
+        steering_options = dict(
+            x="distance",
+            y="steering_angle",
+            line_width=2,
+            line_color=color,
+            line_dash=line_dash,
+            line_alpha=0.95,
+            visible=visible,
+        )
+        self._add_renderer(
+            source,
+            self.f_pedal_inputs,
+            self.throttle_lines,
+            **throttle_options,
+        )
+        self._add_renderer(
+            source,
+            self.f_pedal_inputs,
+            self.braking_lines,
+            **brake_options,
+        )
+        self._add_renderer(
+            source,
+            self.f_steering,
+            self.steering_lines,
+            **steering_options,
+        )
+        self._add_renderer(
+            source,
+            self.f_coasting,
+            self.coasting_lines,
             x="distance",
             y="coast",
-            source=source,
-            legend_label=legend,
             line_width=1,
-            color=color,
-            line_alpha=1,
-            visible=visible
-        ))
-
-        self.tires_lines.append(self.f_tires.line(
+            line_color=color,
+            line_dash=line_dash,
+            line_alpha=0.9,
+            visible=visible,
+        )
+        self._add_renderer(
+            source,
+            self.f_tires,
+            self.tires_lines,
             x="distance",
             y="tires",
-            source=source,
-            legend_label=legend,
             line_width=1,
-            color=color,
-            line_alpha=1,
-            visible=visible
-        ))
-
-        self.gears_lines.append(self.f_gear.line(
+            line_color=color,
+            line_dash=line_dash,
+            line_alpha=0.9,
+            visible=visible,
+        )
+        self._add_renderer(
+            source,
+            self.f_gear,
+            self.gears_lines,
             x="distance",
             y="gear",
-            source=source,
-            legend_label=legend,
             line_width=1,
-            color=color,
-            line_alpha=1,
-            visible=visible
-        ))
-
-        self.rpm_lines.append(self.f_rpm.line(
+            line_color=color,
+            line_dash=line_dash,
+            line_alpha=0.9,
+            visible=visible,
+        )
+        self._add_renderer(
+            source,
+            self.f_rpm,
+            self.rpm_lines,
             x="distance",
             y="rpm",
-            source=source,
-            legend_label=legend,
             line_width=1,
-            color=color,
-            line_alpha=1,
-            visible=visible
-        ))
-
-        self.boost_lines.append(self.f_boost.line(
+            line_color=color,
+            line_dash=line_dash,
+            line_alpha=0.9,
+            visible=visible,
+        )
+        self._add_renderer(
+            source,
+            self.f_boost,
+            self.boost_lines,
             x="distance",
             y="boost",
-            source=source,
-            legend_label=legend,
             line_width=1,
-            color=color,
-            line_alpha=1,
-            visible=visible
-        ))
-
-        self.yaw_rate_lines.append(self.f_yaw_rate.line(
+            line_color=color,
+            line_dash=line_dash,
+            line_alpha=0.9,
+            visible=visible,
+        )
+        self._add_renderer(
+            source,
+            self.f_yaw_rate,
+            self.yaw_rate_lines,
             x="distance",
             y="yaw_rate",
-            source=source,
-            legend_label=legend,
             line_width=1,
-            color=color,
-            line_alpha=1,
-            visible=visible
-        ))
+            line_color=color,
+            line_dash=line_dash,
+            line_alpha=0.9,
+            visible=visible,
+        )
 
+        if additional:
+            self._additional_source_ids.append(source.id)
         return source
 
     def get_layout(self) -> Column:
         return self.layout
 
     def delete_all_additional_laps(self):
-        # Delete all but first three in list
+        removed_renderers = set()
+        for source_id in self._additional_source_ids:
+            for telemetry_plot, renderer in self._renderer_groups.pop(source_id, []):
+                if renderer in telemetry_plot.renderers:
+                    telemetry_plot.renderers.remove(renderer)
+                removed_renderers.add(renderer)
+
+        for collection in [
+            self.speed_lines,
+            self.throttle_lines,
+            self.braking_lines,
+            self.steering_lines,
+            self.coasting_lines,
+            self.tires_lines,
+            self.gears_lines,
+            self.rpm_lines,
+            self.boost_lines,
+            self.yaw_rate_lines,
+        ]:
+            collection[:] = [
+                renderer for renderer in collection if renderer not in removed_renderers
+            ]
+
         self.sources_additional_laps = []
+        self._additional_source_ids = []
+        self.update_steering_visibility()
 
-        for i, _ in enumerate(self.f_speed.renderers):
-            if i >= self.number_of_default_laps:
-                self.f_speed.renderers.remove(self.f_speed.renderers[i])  # remove the line renderer
-                self.f_throttle.renderers.remove(self.f_throttle.renderers[i])  # remove the line renderer
-                self.f_braking.renderers.remove(self.f_braking.renderers[i])  # remove the line renderer
-                self.f_coasting.renderers.remove(self.f_coasting.renderers[i])  # remove the line renderer
-                self.f_tires.renderers.remove(self.f_tires.renderers[i])  # remove the line renderer
-                self.f_boost.renderers.remove(self.f_boost.renderers[i])  # remove the line renderer
-                self.f_yaw_rate.renderers.remove(self.f_yaw_rate.renderers[i])  # remove the line renderer
-                # self.f_time_diff.renderers.remove(self.f_time_diff.renderers[i])  # remove the line renderer
 
-                self.f_speed.legend.items.pop(i)
-                self.f_throttle.legend.items.pop(i)
-                self.f_braking.legend.items.pop(i)
-                self.f_coasting.legend.items.pop(i)
-                self.f_tires.legend.items.pop(i)
-                self.f_yaw_rate.legend.items.pop(i)
-                self.f_boost.legend.items.pop(i)
-                # self.f_time_diff.legend.items.pop(i)
+class LinkedRaceLine(object):
+    """Race-line detail and context plots linked to a distance Range1d."""
+
+    def __init__(self, analysis_range: Range1d, width=360):
+        self.analysis_range = analysis_range
+        empty_data = {"distance": [], "raceline_x": [], "raceline_z": []}
+        self.full_last_source = ColumnDataSource(data=empty_data.copy())
+        self.full_reference_source = ColumnDataSource(data=empty_data.copy())
+        self.last_segment_source = ColumnDataSource(data=empty_data.copy())
+        self.reference_segment_source = ColumnDataSource(data=empty_data.copy())
+        self.cursor_source = ColumnDataSource(
+            data={"raceline_x": [], "raceline_z": [], "distance": []}
+        )
+
+        self.x_range = Range1d(start=-1, end=1)
+        # A reversed range matches the in-game orientation used by the existing map.
+        self.y_range = Range1d(start=1, end=-1)
+        self.figure = figure(
+            x_range=self.x_range,
+            y_range=self.y_range,
+            match_aspect=True,
+            width=width,
+            height=390,
+            sizing_mode="stretch_width",
+            tools="pan,wheel_zoom,box_zoom,reset,save",
+            active_scroll="wheel_zoom",
+        )
+        self.last_renderer = self.figure.line(
+            x="raceline_x",
+            y="raceline_z",
+            source=self.last_segment_source,
+            line_width=3,
+            line_color="#2563eb",
+        )
+        self.reference_renderer = self.figure.line(
+            x="raceline_x",
+            y="raceline_z",
+            source=self.reference_segment_source,
+            line_width=3,
+            line_color="#a21caf",
+            line_dash="dashed",
+        )
+        self.figure.scatter(
+            x="raceline_x",
+            y="raceline_z",
+            source=self.cursor_source,
+            marker="circle",
+            size=9,
+            fill_color="#f59e0b",
+            line_color="white",
+            line_width=2,
+        )
+        self.figure.axis.visible = False
+        self.figure.grid.visible = False
+        self.figure.toolbar.autohide = True
+        self.figure.title.visible = False
+
+        self.context_figure = figure(
+            match_aspect=True,
+            width=width,
+            height=170,
+            sizing_mode="stretch_width",
+            toolbar_location=None,
+            tools="",
+        )
+        self.context_figure.line(
+            x="raceline_x",
+            y="raceline_z",
+            source=self.full_last_source,
+            line_width=2,
+            line_color="#94a3b8",
+            line_alpha=0.7,
+        )
+        self.context_figure.line(
+            x="raceline_x",
+            y="raceline_z",
+            source=self.last_segment_source,
+            line_width=4,
+            line_color="#2563eb",
+        )
+        self.context_figure.line(
+            x="raceline_x",
+            y="raceline_z",
+            source=self.reference_segment_source,
+            line_width=3,
+            line_color="#a21caf",
+            line_dash="dashed",
+        )
+        self.context_figure.y_range.flipped = True
+        self.context_figure.axis.visible = False
+        self.context_figure.grid.visible = False
+        self.context_figure.title.visible = False
+
+        self.layout = column(
+            self.figure,
+            self.context_figure,
+            width=width,
+            sizing_mode="stretch_width",
+            spacing=4,
+        )
+
+        self.range_callback = CustomJS(
+            args=dict(
+                selected_range=self.analysis_range,
+                full_last=self.full_last_source,
+                full_reference=self.full_reference_source,
+                last_segment=self.last_segment_source,
+                reference_segment=self.reference_segment_source,
+                cursor=self.cursor_source,
+                map_x_range=self.x_range,
+                map_y_range=self.y_range,
+            ),
+            code="""
+                const start = Math.min(selected_range.start, selected_range.end)
+                const end = Math.max(selected_range.start, selected_range.end)
+
+                function selectedData(source) {
+                    const distances = source.data.distance || []
+                    const xs = source.data.raceline_x || []
+                    const zs = source.data.raceline_z || []
+                    const result = {distance: [], raceline_x: [], raceline_z: []}
+                    const count = Math.min(distances.length, xs.length, zs.length)
+                    for (let index = 0; index < count; index++) {
+                        const distance = distances[index]
+                        if (distance >= start && distance <= end && xs[index] != null && zs[index] != null) {
+                            result.distance.push(distance)
+                            result.raceline_x.push(xs[index])
+                            result.raceline_z.push(zs[index])
+                        }
+                    }
+                    return result
+                }
+
+                const lastData = selectedData(full_last)
+                const referenceData = selectedData(full_reference)
+                last_segment.data = lastData
+                reference_segment.data = referenceData
+
+                const allX = lastData.raceline_x.concat(referenceData.raceline_x)
+                const allZ = lastData.raceline_z.concat(referenceData.raceline_z)
+                if (allX.length > 0 && allZ.length > 0) {
+                    let minX = allX[0]
+                    let maxX = allX[0]
+                    let minZ = allZ[0]
+                    let maxZ = allZ[0]
+                    for (let index = 1; index < allX.length; index++) {
+                        minX = Math.min(minX, allX[index])
+                        maxX = Math.max(maxX, allX[index])
+                    }
+                    for (let index = 1; index < allZ.length; index++) {
+                        minZ = Math.min(minZ, allZ[index])
+                        maxZ = Math.max(maxZ, allZ[index])
+                    }
+                    const span = Math.max(maxX - minX, maxZ - minZ, 1) * 1.16
+                    const centerX = (minX + maxX) / 2
+                    const centerZ = (minZ + maxZ) / 2
+                    map_x_range.start = centerX - span / 2
+                    map_x_range.end = centerX + span / 2
+                    map_y_range.start = centerZ + span / 2
+                    map_y_range.end = centerZ - span / 2
+                    map_x_range.reset_start = map_x_range.start
+                    map_x_range.reset_end = map_x_range.end
+                    map_y_range.reset_start = map_y_range.start
+                    map_y_range.reset_end = map_y_range.end
+                }
+
+                if (lastData.distance.length > 0) {
+                    const target = (start + end) / 2
+                    let nearest = 0
+                    let nearestDelta = Math.abs(lastData.distance[0] - target)
+                    for (let index = 1; index < lastData.distance.length; index++) {
+                        const delta = Math.abs(lastData.distance[index] - target)
+                        if (delta < nearestDelta) {
+                            nearest = index
+                            nearestDelta = delta
+                        }
+                    }
+                    cursor.data = {
+                        distance: [lastData.distance[nearest]],
+                        raceline_x: [lastData.raceline_x[nearest]],
+                        raceline_z: [lastData.raceline_z[nearest]],
+                    }
+                } else {
+                    cursor.data = {distance: [], raceline_x: [], raceline_z: []}
+                }
+            """,
+        )
+        self.analysis_range.js_on_change("start", self.range_callback)
+        self.analysis_range.js_on_change("end", self.range_callback)
+
+    @staticmethod
+    def _race_line_data(lap_data):
+        if not lap_data:
+            return {"distance": [], "raceline_x": [], "raceline_z": []}
+
+        distances = lap_data.get("distance", [])
+        xs = lap_data.get("raceline_x", [])
+        zs = lap_data.get("raceline_z", [])
+        count = min(len(distances), len(xs), len(zs))
+        result = {"distance": [], "raceline_x": [], "raceline_z": []}
+        for index in range(count):
+            distance = distances[index]
+            x = xs[index]
+            z = zs[index]
+            if distance is None or x is None or z is None:
+                continue
+            result["distance"].append(float(distance))
+            result["raceline_x"].append(float(x))
+            result["raceline_z"].append(float(z))
+        return result
+
+    @staticmethod
+    def _selected_data(source_data, start, end):
+        selected = {"distance": [], "raceline_x": [], "raceline_z": []}
+        for distance, x, z in zip(
+            source_data["distance"],
+            source_data["raceline_x"],
+            source_data["raceline_z"],
+        ):
+            if start <= distance <= end:
+                selected["distance"].append(distance)
+                selected["raceline_x"].append(x)
+                selected["raceline_z"].append(z)
+        return selected
+
+    def update_laps(self, last_lap_data, reference_lap_data=None):
+        self.full_last_source.data = self._race_line_data(last_lap_data)
+        self.full_reference_source.data = self._race_line_data(reference_lap_data)
+        self.update_selected_segment()
+
+    def link_cursor_to_plots(self, plots):
+        cursor_callback = CustomJS(
+            args=dict(full_last=self.full_last_source, cursor=self.cursor_source),
+            code="""
+                const distances = full_last.data.distance || []
+                const xs = full_last.data.raceline_x || []
+                const zs = full_last.data.raceline_z || []
+                const count = Math.min(distances.length, xs.length, zs.length)
+                if (count === 0 || cb_obj.x == null) {
+                    return
+                }
+
+                const target = cb_obj.x
+                let low = 0
+                let high = count - 1
+                while (low < high) {
+                    const middle = Math.floor((low + high) / 2)
+                    if (distances[middle] < target) {
+                        low = middle + 1
+                    } else {
+                        high = middle
+                    }
+                }
+                let nearest = low
+                if (nearest > 0 && Math.abs(distances[nearest - 1] - target) < Math.abs(distances[nearest] - target)) {
+                    nearest -= 1
+                }
+                cursor.data = {
+                    distance: [distances[nearest]],
+                    raceline_x: [xs[nearest]],
+                    raceline_z: [zs[nearest]],
+                }
+            """,
+        )
+        for telemetry_plot in plots:
+            telemetry_plot.js_on_event(MouseMove, cursor_callback)
+
+    def update_selected_segment(self):
+        start = min(self.analysis_range.start, self.analysis_range.end)
+        end = max(self.analysis_range.start, self.analysis_range.end)
+        last_data = self._selected_data(self.full_last_source.data, start, end)
+        reference_data = self._selected_data(
+            self.full_reference_source.data, start, end
+        )
+        self.last_segment_source.data = last_data
+        self.reference_segment_source.data = reference_data
+
+        all_x = last_data["raceline_x"] + reference_data["raceline_x"]
+        all_z = last_data["raceline_z"] + reference_data["raceline_z"]
+        if all_x and all_z:
+            min_x, max_x = min(all_x), max(all_x)
+            min_z, max_z = min(all_z), max(all_z)
+            span = max(max_x - min_x, max_z - min_z, 1) * 1.16
+            center_x = (min_x + max_x) / 2
+            center_z = (min_z + max_z) / 2
+            self.x_range.start = center_x - span / 2
+            self.x_range.end = center_x + span / 2
+            self.y_range.start = center_z + span / 2
+            self.y_range.end = center_z - span / 2
+            self.x_range.reset_start = self.x_range.start
+            self.x_range.reset_end = self.x_range.end
+            self.y_range.reset_start = self.y_range.start
+            self.y_range.reset_end = self.y_range.end
+
+        if last_data["distance"]:
+            center_distance = (start + end) / 2
+            nearest_index = min(
+                range(len(last_data["distance"])),
+                key=lambda index: abs(
+                    last_data["distance"][index] - center_distance
+                ),
+            )
+            self.cursor_source.data = {
+                "distance": [last_data["distance"][nearest_index]],
+                "raceline_x": [last_data["raceline_x"][nearest_index]],
+                "raceline_z": [last_data["raceline_z"][nearest_index]],
+            }
+        else:
+            self.cursor_source.data = {
+                "distance": [],
+                "raceline_x": [],
+                "raceline_z": [],
+            }
+
+    def get_layout(self):
+        return self.layout
 
 
 

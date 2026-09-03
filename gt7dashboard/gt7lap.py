@@ -1,3 +1,4 @@
+import math
 from datetime import datetime
 from gt7dashboard import gt7helper
 
@@ -153,6 +154,36 @@ class Lap:
             return "Car not logged"
         return gt7helper.get_car_name_for_car_id(self.car_id)
 
+    def get_steering_angle_degrees(self) -> list:
+        """Return the mean front-wheel steering angle, aligned to lap samples."""
+        sample_count = len(self.data_speed)
+        left_angles = getattr(self, "data_front_left_steering_angle_rad", [])
+        right_angles = getattr(self, "data_front_right_steering_angle_rad", [])
+        steering_angles = []
+
+        for index in range(sample_count):
+            available_angles = []
+            for values in (left_angles, right_angles):
+                if index >= len(values) or values[index] is None:
+                    continue
+                try:
+                    angle = float(values[index])
+                except (TypeError, ValueError):
+                    continue
+                if math.isfinite(angle):
+                    available_angles.append(angle)
+
+            if available_angles:
+                mean_angle = sum(available_angles) / len(available_angles)
+                steering_angles.append(math.degrees(mean_angle))
+            else:
+                steering_angles.append(None)
+
+        return steering_angles
+
+    def has_steering_angle_data(self) -> bool:
+        return any(value is not None for value in self.get_steering_angle_degrees())
+
     def get_data_dict(self, distance_mode=True) -> dict[str, list]:
 
         raceline_y_throttle, raceline_x_throttle, raceline_z_throttle = gt7helper.get_race_line_coordinates_when_mode_is_active(self, mode=gt7helper.RACE_LINE_THROTTLE_MODE)
@@ -168,6 +199,7 @@ class Lap:
             "rpm": self.data_rpm,
             "boost": self.data_boost,
             "yaw_rate": self.data_absolute_yaw_rate_per_second,
+            "steering_angle": self.get_steering_angle_degrees(),
             "gear": self.data_gear,
             "ticks": list(range(len(self.data_speed))),
             "coast": self.data_coasting,

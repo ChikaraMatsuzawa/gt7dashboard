@@ -7,13 +7,10 @@ from typing import List
 
 import bokeh.application
 from bokeh.driving import linear
-from bokeh.layouts import layout
+from bokeh.layouts import column, layout, row
 from bokeh.models import (
     Select,
     Paragraph,
-    ColumnDataSource,
-    TableColumn,
-    DataTable,
     Button,
     Div, CheckboxGroup, TabPanel, Tabs,
 )
@@ -83,8 +80,6 @@ def update_race_lines(laps: List[Lap], reference_lap: Lap):
 
     for i, lap in enumerate(laps[:len(race_lines)]):
         logger.info(f"Updating Race Line for Lap {len(laps) -i} - {lap.title} and reference lap {reference_lap.title}")
-
-        race_lines[i].title.text = "Lap %d - %s (%s), Reference Lap: %s (%s)" % (len(laps) - i, lap.title, lap.car_name(), reference_lap.title, reference_lap.car_name())
 
         lap_data = lap.get_data_dict()
         race_lines_data[i][0].data_source.data = lap_data
@@ -181,22 +176,45 @@ def update_speed_velocity_graph(laps: List[Lap]):
         laps, reference_lap_selected=g_reference_lap_selected
     )
 
+    last_lap_data = None
+    reference_lap_data = None
+
     if last_lap:
         last_lap_data = last_lap.get_data_dict()
         race_diagram.source_last_lap.data = last_lap_data
-        last_lap_race_line.data_source.data = last_lap_data
+        race_diagram.update_analysis_domain(last_lap_data["distance"])
 
         if reference_lap and len(reference_lap.data_speed) > 0:
             reference_lap_data = reference_lap.get_data_dict()
             race_diagram.source_time_diff.data = calculate_time_diff_by_distance(reference_lap, last_lap)
             race_diagram.source_reference_lap.data = reference_lap_data
-            reference_lap_race_line.data_source.data = reference_lap_data
+        else:
+            race_diagram.source_time_diff.data = {
+                "distance": [],
+                "timedelta": [],
+                "reference": [],
+                "comparison": [],
+            }
+            race_diagram.source_reference_lap.data = Lap().get_data_dict()
+    else:
+        race_diagram.source_last_lap.data = Lap().get_data_dict()
+        race_diagram.source_reference_lap.data = Lap().get_data_dict()
+        race_diagram.clear_analysis_domain()
+        race_diagram.source_time_diff.data = {
+            "distance": [],
+            "timedelta": [],
+            "reference": [],
+            "comparison": [],
+        }
 
     if median_lap:
         race_diagram.source_median_lap.data = median_lap.get_data_dict()
+    else:
+        race_diagram.source_median_lap.data = Lap().get_data_dict()
 
+    race_diagram.update_steering_visibility()
+    linked_race_line.update_laps(last_lap_data, reference_lap_data)
 
-    s_race_line.legend.visible = False
     s_race_line.axis.visible = False
 
     fastest_laps = race_diagram.update_fastest_laps_variance(laps)
@@ -209,10 +227,10 @@ def update_speed_velocity_graph(laps: List[Lap]):
     # Adding Brake Points is slow when rendering, this is on Bokehs side about 3s
     brake_points_enabled = os.environ.get("GT7_ADD_BRAKEPOINTS") == "true"
 
-    if brake_points_enabled and len(last_lap.data_braking) > 0:
+    if brake_points_enabled and last_lap and len(last_lap.data_braking) > 0:
         update_break_points(last_lap, s_race_line, "blue")
 
-    if brake_points_enabled and len(reference_lap.data_braking) > 0:
+    if brake_points_enabled and reference_lap and len(reference_lap.data_braking) > 0:
         update_break_points(reference_lap, s_race_line, "magenta")
 
 
@@ -387,63 +405,34 @@ def table_row_selection_callback(attrname, old, new):
     selectionIndex=race_time_table.lap_times_source.selected.indices
     logger.info("you have selected the row nr "+str(selectionIndex))
 
-    colors = ["blue", "magenta", "green", "orange", "black", "purple"]
-    # max_additional_laps = len(palette)
-    colors_index = len(race_diagram.sources_additional_laps) + race_diagram.number_of_default_laps # which are the default colors
+    colors = ["orange", "black", "purple", "brown", "gray", "teal"]
+    race_diagram.delete_all_additional_laps()
 
-    for index in selectionIndex:
-        if index >= len(colors):
-            colors_index = 0
-
-        # get element at index of iterator
-        color = colors[colors_index]
-        colors_index+=1
+    for color_index, index in enumerate(selectionIndex):
+        if index >= len(g_laps_stored):
+            continue
+        color = colors[color_index % len(colors)]
         lap_to_add = g_laps_stored[index]
-        new_lap_data_source = race_diagram.add_lap_to_race_diagram(color, legend=g_laps_stored[index].title, visible=True)
-        new_lap_data_source.data = lap_to_add.get_data_dict()
+        race_diagram.add_additional_lap_to_race_diagram(
+            color, lap_to_add, visible=True
+        )
 
 
 race_time_table.lap_times_source.selected.on_change('indices', table_row_selection_callback)
 
 # Race line
-
-race_line_tooltips = [("index", "$index"), ("Breakpoint", "")]
-race_line_width = 250
-speed_diagram_width = 1200
-total_width = race_line_width + speed_diagram_width
-s_race_line = figure(
-    title="Race Line",
-    x_axis_label="x",
-    y_axis_label="z",
-    match_aspect=True,
-    width=race_line_width,
-    height=race_line_width,
-    active_drag="box_zoom",
-    tooltips=race_line_tooltips,
+linked_race_line = gt7diagrams.LinkedRaceLine(
+    race_diagram.analysis_range, width=360
 )
-
-# We set this to true, since maps appear flipped in the game
-# compared to their actual coordinates
-s_race_line.y_range.flipped = True
-
-s_race_line.toolbar.autohide = True
-
-last_lap_race_line = s_race_line.line(
-    x="raceline_x",
-    y="raceline_z",
-    legend_label="Last Lap",
-    line_width=1,
-    color="blue",
-    source=ColumnDataSource(data={"raceline_x": [], "raceline_z": []})
+linked_race_line.link_cursor_to_plots(
+    [
+        race_diagram.f_time_diff,
+        race_diagram.f_speed,
+        race_diagram.f_pedal_inputs,
+        race_diagram.f_steering,
+    ]
 )
-reference_lap_race_line = s_race_line.line(
-    x="raceline_x",
-    y="raceline_z",
-    legend_label="Reference Lap",
-    line_width=1,
-    color="magenta",
-    source=ColumnDataSource(data={"raceline_x": [], "raceline_z": []})
-)
+s_race_line = linked_race_line.figure
 
 select_title = Paragraph(text="Load Laps:", align="center")
 select = Select(value="laps", options=stored_lap_files)
@@ -480,24 +469,160 @@ LABELS = ["Record Replays"]
 checkbox_group = CheckboxGroup(labels=LABELS, active=[1])
 checkbox_group.on_change("active", always_record_checkbox_handler)
 
-race_time_table.t_lap_times.width=900
+race_time_table.t_lap_times.sizing_mode = "stretch_width"
 
-l1 = layout(
-    children=[
-        [get_help_div(gt7help.HEADER), div_connection_info, div_gt7_dashboard, div_header_line, reset_button, save_button, select_title, select, get_help_div(gt7help.LAP_CONTROLS)],
-        [get_help_div(gt7help.TIME_DIFF), race_diagram.f_time_diff, layout(children=[manual_log_button, checkbox_group, reference_lap_select]), get_help_div(gt7help.MANUAL_CONTROLS)],
-        [get_help_div(gt7help.SPEED_DIAGRAM), race_diagram.f_speed, s_race_line, get_help_div(gt7help.RACE_LINE_MINI)],
-        [get_help_div(gt7help.SPEED_VARIANCE), race_diagram.f_speed_variance, div_deviance_laps_on_display, get_help_div(gt7help.SPEED_VARIANCE)],
-        [get_help_div(gt7help.THROTTLE_DIAGRAM), race_diagram.f_throttle, div_speed_peak_valley_diagram, get_help_div(gt7help.SPEED_PEAKS_AND_VALLEYS)],
-        [get_help_div(gt7help.YAW_RATE_DIAGRAM), race_diagram.f_yaw_rate],
-        [get_help_div(gt7help.BRAKING_DIAGRAM), race_diagram.f_braking],
-        [get_help_div(gt7help.COASTING_DIAGRAM), race_diagram.f_coasting],
-        [get_help_div(gt7help.GEAR_DIAGRAM), race_diagram.f_gear],
-        [get_help_div(gt7help.RPM_DIAGRAM), race_diagram.f_rpm],
-        [get_help_div(gt7help.BOOST_DIAGRAM), race_diagram.f_boost],
-        [get_help_div(gt7help.TIRE_DIAGRAM), race_diagram.f_tires],
-        [get_help_div(gt7help.TIME_TABLE), race_time_table.t_lap_times, get_help_div(gt7help.FUEL_MAP), div_fuel_map, get_help_div(gt7help.TUNING_INFO), div_tuning_info],
-    ]
+RESPONSIVE_WRAP_STYLESHEET = """
+@media (max-width: 1100px) {
+  :host {
+    flex-wrap: wrap !important;
+    height: fit-content !important;
+  }
+}
+"""
+RESPONSIVE_FULL_WIDTH_STYLESHEET = """
+@media (max-width: 1100px) {
+  :host {
+    width: 100% !important;
+    min-width: 100% !important;
+    flex-basis: 100% !important;
+  }
+}
+"""
+RESPONSIVE_MAP_STYLESHEET = """
+@media (max-width: 1100px) {
+  :host {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    flex-basis: 100% !important;
+  }
+}
+"""
+
+
+def with_help(help_text, content):
+    return row(
+        get_help_div(help_text),
+        content,
+        sizing_mode="stretch_width",
+        spacing=4,
+    )
+
+
+header_controls = row(
+    get_help_div(gt7help.HEADER),
+    div_connection_info,
+    div_gt7_dashboard,
+    div_header_line,
+    reset_button,
+    save_button,
+    select_title,
+    select,
+    get_help_div(gt7help.LAP_CONTROLS),
+    sizing_mode="stretch_width",
+    stylesheets=[RESPONSIVE_WRAP_STYLESHEET],
+)
+
+manual_controls = row(
+    manual_log_button,
+    checkbox_group,
+    reference_lap_select,
+    get_help_div(gt7help.MANUAL_CONTROLS),
+    sizing_mode="stretch_width",
+    stylesheets=[RESPONSIVE_WRAP_STYLESHEET],
+)
+
+secondary_tabs = Tabs(
+    tabs=[
+        TabPanel(
+            title="Consistency",
+            child=column(
+                with_help(gt7help.SPEED_VARIANCE, race_diagram.f_speed_variance),
+                row(
+                    div_deviance_laps_on_display,
+                    div_speed_peak_valley_diagram,
+                    sizing_mode="stretch_width",
+                    spacing=12,
+                ),
+                sizing_mode="stretch_width",
+                spacing=4,
+            ),
+        ),
+        TabPanel(
+            title="Yaw",
+            child=with_help(gt7help.YAW_RATE_DIAGRAM, race_diagram.f_yaw_rate),
+        ),
+        TabPanel(
+            title="Coasting",
+            child=with_help(gt7help.COASTING_DIAGRAM, race_diagram.f_coasting),
+        ),
+        TabPanel(
+            title="Gear / RPM",
+            child=column(
+                with_help(gt7help.GEAR_DIAGRAM, race_diagram.f_gear),
+                with_help(gt7help.RPM_DIAGRAM, race_diagram.f_rpm),
+                sizing_mode="stretch_width",
+                spacing=4,
+            ),
+        ),
+        TabPanel(
+            title="Boost",
+            child=with_help(gt7help.BOOST_DIAGRAM, race_diagram.f_boost),
+        ),
+        TabPanel(
+            title="Tires",
+            child=with_help(gt7help.TIRE_DIAGRAM, race_diagram.f_tires),
+        ),
+    ],
+    sizing_mode="stretch_width",
+)
+
+analysis_plots = column(
+    with_help(gt7help.ANALYSIS_WINDOW, race_diagram.navigator_layout),
+    with_help(gt7help.TIME_DIFF, race_diagram.f_time_diff),
+    with_help(gt7help.SPEED_DIAGRAM, race_diagram.f_speed),
+    with_help(gt7help.PEDAL_INPUTS_DIAGRAM, race_diagram.f_pedal_inputs),
+    with_help(gt7help.STEERING_DIAGRAM, race_diagram.steering_view),
+    secondary_tabs,
+    sizing_mode="stretch_width",
+    spacing=4,
+    stylesheets=[RESPONSIVE_FULL_WIDTH_STYLESHEET],
+)
+
+race_line_panel = column(
+    get_help_div(gt7help.RACE_LINE_MINI),
+    linked_race_line.get_layout(),
+    width=360,
+    max_width=360,
+    sizing_mode="stretch_width",
+    spacing=4,
+    stylesheets=[RESPONSIVE_MAP_STYLESHEET],
+)
+
+analysis_workspace = row(
+    analysis_plots,
+    race_line_panel,
+    sizing_mode="stretch_width",
+    stylesheets=[RESPONSIVE_WRAP_STYLESHEET],
+)
+
+lap_summary = row(
+    with_help(gt7help.TIME_TABLE, race_time_table.t_lap_times),
+    column(
+        with_help(gt7help.FUEL_MAP, div_fuel_map),
+        with_help(gt7help.TUNING_INFO, div_tuning_info),
+        width=240,
+    ),
+    sizing_mode="stretch_width",
+    stylesheets=[RESPONSIVE_WRAP_STYLESHEET],
+)
+
+l1 = column(
+    header_controls,
+    manual_controls,
+    analysis_workspace,
+    lap_summary,
+    sizing_mode="stretch_width",
 )
 
 
@@ -505,11 +630,11 @@ l1 = layout(
 
 l2, race_lines, race_lines_data = get_race_lines_layout(number_of_race_lines=1)
 
-l3 = layout(
-    [
-        [reset_button, save_button],
-        [div_speed_peak_valley_diagram, div_fuel_map], # TODO Race table does not render twice, one rendering will be empty
-     ],
+l3 = Div(
+    text=(
+        "<p>Session controls and lap summaries are available in the "
+        "<b>Get Faster</b> tab.</p>"
+    ),
     sizing_mode="stretch_width",
 )
 
