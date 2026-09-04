@@ -170,6 +170,10 @@ Use **Compare Saved Files** to open the saved-file comparison panel. Select one 
 
 The comparison lap is blue and solid; the reference lap is magenta and dashed. Overlays use orange dot-dash and dark-gray dotted lines. The time-difference chart shows comparison minus reference, and the analysis window is limited to the distance shared by both selected laps. Laps with substantially different total distances are not compared; a start/finish-position mismatch is shown as a warning because saved telemetry does not contain an explicit circuit id.
 
+#### Live Telemetry
+
+While driving, the dashboard streams the current lap as an orange dot-dash trace approximately four times per second. The completed last lap remains blue, so current inputs and speed can be inspected without losing the historical comparison. The linked race line follows the live trace during driving; the live time-difference trace is refreshed once per second against the selected reference lap. Saved-file comparison intentionally pauses live rendering until it is cleared.
+
 #### Time / Diff
 
 ![screenshot_header](README.assets/screenshot_timediff.png)
@@ -177,7 +181,7 @@ The comparison lap is blue and solid; the reference lap is magenta and dashed. O
 This is a graph for showing the relative time difference between the comparison lap and the reference lap.
 Values above zero mean the comparison lap is slower than the reference lap. Values below zero mean it is faster.
 
-The value is calculated as Comparison minus Reference at the same distance around the track.
+The value is calculated as Comparison minus Reference at the same distance around the track. During a live lap, an orange dot-dash trace shows the current lap against the selected reference and refreshes once per second.
 
 
 #### Manual Controls
@@ -199,7 +203,7 @@ Select a section of the lap by distance. Drag the highlighted region to move it,
 
 ![screenshot_header](README.assets/screenshot_speed.png)
 
-The total speed of the laps selected. This value is in km/h. or mph. depending on your in-game setting. The comparison lap is a blue solid line, the reference lap is a magenta dashed line, and the median lap is a gray dotted line in live mode.
+The total speed of the laps selected. This value is in km/h. or mph. depending on your in-game setting. The completed comparison lap is a blue solid line, the reference lap is a magenta dashed line, the running live lap is orange dot-dash, and the median lap is gray dotted.
 
 #### Race Line
 
@@ -207,7 +211,7 @@ The total speed of the laps selected. This value is in km/h. or mph. depending o
 
 This race line follows the distance selected in the analysis window. The large view automatically fits the selected section; the smaller view keeps the full course in context.
 
-The comparison lap is blue and the reference lap is magenta.
+During a lap it follows the orange Live Lap trace. The completed comparison lap is blue and the reference lap is magenta.
 
 #### Peaks and Valleys
 
@@ -236,7 +240,7 @@ If they had one graph it would be the deviation in the (best) laps of the same d
 
 #### Pedal Inputs
 
-Throttle and brake are shown together on the same 0% to 100% scale. Throttle is green and brake is red. Solid lines are the comparison lap and dashed lines are the reference lap; these fixed styles replace a separate legend.
+Throttle and brake are shown together on the same 0% to 100% scale. Throttle is green and brake is red. Solid lines are the completed comparison lap, dashed lines are the reference lap, and dot-dash lines are the running live lap; these fixed styles replace a separate legend.
 
 #### Yaw Rate / Second
 
@@ -248,7 +252,7 @@ This is the yaw rate per second of your car. Use this to determine the Maximum R
 
 #### Steering Angle
 
-The mean of the front-left and front-right wheel steering angles is shown in degrees. This data is available when laps are recorded with packet format C. The chart starts at a symmetric ±10° scale and expands in 5° steps when needed. The comparison lap is a blue solid line and the reference lap is a magenta dashed line.
+The mean of the front-left and front-right wheel steering angles is shown in degrees. This data is available when laps are recorded with packet format C. The chart starts at a symmetric ±10° scale and expands in 5° steps when needed. The completed comparison lap is blue and solid, the reference lap is magenta and dashed, and the running live lap is orange dot-dash.
 
 #### Coasting
 

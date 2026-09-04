@@ -188,13 +188,15 @@ class RaceDiagram(object):
         self.source_last_lap = None
         self.source_reference_lap = None
         self.source_median_lap = None
+        self.source_live_lap = None
+        self.source_live_time_diff = None
         self.sources_additional_laps = []
         self._renderer_groups = {}
         self._additional_source_ids = []
         self._lap_distance_max = 0.0
 
         self.additional_laps = []
-        self.number_of_default_laps = 3
+        self.number_of_default_laps = 4
 
         tooltips = [
             ("Distance", "@distance{0} m"),
@@ -342,6 +344,18 @@ class RaceDiagram(object):
             color="#2563eb",
             line_alpha=1,
         )
+        self.source_live_time_diff = ColumnDataSource(
+            data={"distance": [], "timedelta": [], "reference": [], "comparison": []}
+        )
+        self.f_time_diff.line(
+            x="distance",
+            y="timedelta",
+            source=self.source_live_time_diff,
+            line_width=2,
+            color="#f59e0b",
+            line_dash="dotdash",
+            line_alpha=1,
+        )
 
         self.source_last_lap = self.add_lap_to_race_diagram(
             "#2563eb", "Last Lap", True
@@ -351,6 +365,9 @@ class RaceDiagram(object):
         )
         self.source_median_lap = self.add_lap_to_race_diagram(
             "#64748b", "Median Lap", False
+        )
+        self.source_live_lap = self.add_lap_to_race_diagram(
+            "#f59e0b", "Live Lap", True
         )
 
         self.source_speed_variance = ColumnDataSource(
@@ -396,6 +413,17 @@ class RaceDiagram(object):
             self.source_reference_lap,
             self.f_overview,
             overview_reference_renderer,
+        )
+        overview_live_renderer = self.f_overview.line(
+            x="distance",
+            y="speed",
+            source=self.source_live_lap,
+            line_width=2,
+            color="#f59e0b",
+            line_dash="dotdash",
+        )
+        self._register_renderer(
+            self.source_live_lap, self.f_overview, overview_live_renderer
         )
         self.f_overview.yaxis.visible = False
         self.f_overview.ygrid.visible = False
@@ -545,10 +573,17 @@ class RaceDiagram(object):
         if not valid_distances:
             return
 
+        distance_max = max(valid_distances)
+        # The first live packet can be recorded at the start line. Bokeh does
+        # not allow identical lower and upper bounds, so wait for movement
+        # before constraining the navigator to the lap distance.
+        if distance_max <= 0:
+            return
+
         previous_max = self._lap_distance_max
         previous_width = self.analysis_range.end - self.analysis_range.start
         was_full_lap = previous_max > 0 and previous_width >= previous_max - 1
-        self._lap_distance_max = max(valid_distances)
+        self._lap_distance_max = distance_max
 
         self.full_lap_range.bounds = (0, self._lap_distance_max)
         self.analysis_range.bounds = (0, self._lap_distance_max)
@@ -584,6 +619,7 @@ class RaceDiagram(object):
         sources = [
             self.source_last_lap,
             self.source_reference_lap,
+            self.source_live_lap,
             *self.sources_additional_laps,
         ]
         steering_values = []
@@ -619,6 +655,17 @@ class RaceDiagram(object):
         self.f_steering.y_range.end = extent
         self.f_steering.y_range.reset_start = -extent
         self.f_steering.y_range.reset_end = extent
+
+    def clear_live_telemetry(self):
+        """Remove the running-lap overlay without disturbing completed laps."""
+        self.source_live_lap.data = Lap().get_data_dict()
+        self.source_live_time_diff.data = {
+            "distance": [],
+            "timedelta": [],
+            "reference": [],
+            "comparison": [],
+        }
+        self.update_steering_visibility()
 
     def add_additional_lap_to_race_diagram(
         self,

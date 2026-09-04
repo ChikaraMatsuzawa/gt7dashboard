@@ -2,6 +2,7 @@ import csv
 import itertools
 import json
 import logging
+import math
 import os
 import pickle
 import statistics
@@ -63,11 +64,29 @@ def get_time_delta_dataframe_for_lap(lap: Lap, name: str) -> DataFrame:
     lap_distance = get_x_axis_for_distance(lap)
     lap_time = lap.data_time
 
-    # Multiply to match datatype which is nanoseconds?
-    lap_time_ms = [convert_seconds_to_milliseconds(item) for item in lap_time]
+    # Stored telemetry can retain a session-level time offset. That offset is
+    # shared by samples within a lap but differs between saved files, so remove
+    # it before comparing elapsed time at the same distance.
+    valid_times = []
+    for value in lap_time:
+        try:
+            numeric_value = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(numeric_value):
+            valid_times.append(numeric_value)
+
+    if not valid_times:
+        return DataFrame(columns=[name])
+
+    lap_start_time = valid_times[0]
+    lap_time_ms = [
+        convert_seconds_to_milliseconds(float(value) - lap_start_time)
+        for value in lap_time
+    ]
 
     series = pd.Series(
-        lap_distance, index=pd.TimedeltaIndex(data=lap_time_ms, unit="ms")
+        lap_distance, index=pd.to_timedelta(lap_time_ms, unit="ms")
     )
 
     upsample = series.resample("10ms").asfreq()

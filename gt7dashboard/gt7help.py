@@ -18,7 +18,7 @@ HEADER = """The red or green button reflects the current connection status to Gr
 Next is a brief description of the last and reference lap. During saved-file comparison, this instead shows the selected comparison and reference laps."""
 RACE_LINE_MINI = """This race line follows the distance selected in the analysis window. The large view automatically fits the selected section; the smaller view keeps the full course in context.
 
-The comparison lap is blue and the reference lap is magenta."""
+During a lap it follows the orange Live Lap trace. The completed comparison lap is blue and the reference lap is magenta."""
 MANUAL_CONTROLS = """'Log Lap Now' will log a lap now even if you have not crossed the finish line. This is helpful for missions or license tests where the end of a test is not necessarily identical with the finish line.
 
 The checkbox 'Record Replays' will allow you to record replays. Be careful since also background action before and after a time trial is counted as a replay. This is when a car drives on the track in the background of the menu.
@@ -31,17 +31,17 @@ Use 'Compare Saved Files' to choose multiple saved JSON files, then select an ex
 TIME_DIFF = """This is a graph for showing the relative time difference between the comparison lap and the reference lap.
 Values above zero mean the comparison lap is slower than the reference lap. Values below zero mean it is faster.
 
-The value is calculated as Comparison minus Reference at the same distance around the track.
+The value is calculated as Comparison minus Reference at the same distance around the track. During a live lap, the orange dot-dash trace is refreshed once per second against the selected reference.
 """
 LAP_CONTROLS = """You can reset all laps with the 'Reset Laps' button. This is helpful if you are switching tracks or cars in a session. Otherwise the different tracks will mix in the dashboard.
 'Save Laps' will save your recorded laps to a file. You can load the laps afterwards with the dropdown list to the right."""
-LAP_LINE_STYLES = """The comparison lap is a blue solid line and the reference lap is a magenta dashed line. In live mode, the comparison lap is the latest lap; the median lap is a gray dotted line. Saved-file comparison can add orange dot-dash and dark-gray dotted overlays."""
+LAP_LINE_STYLES = """The completed comparison lap is a blue solid line and the reference lap is a magenta dashed line. In live mode, the running lap is an orange dot-dash trace that updates during driving; the median lap is gray and dotted. Saved-file comparison uses orange dot-dash and dark-gray dotted overlays instead."""
 SPEED_DIAGRAM = """The total speed of the laps selected. This value is in km/h. or mph. depending on your in-game setting.
 
 """ + LAP_LINE_STYLES
 THROTTLE_DIAGRAM = """This is the amount of throttle pressure from 0% to 100% of the laps selected."""
 BRAKING_DIAGRAM = """This is the amount of braking pressure from 0% to 100% of the laps selected."""
-PEDAL_INPUTS_DIAGRAM = """Throttle and brake are shown together on the same 0% to 100% scale. Throttle is green and brake is red. Solid lines are the comparison lap and dashed lines are the reference lap. These fixed colors and line styles replace a separate legend."""
+PEDAL_INPUTS_DIAGRAM = """Throttle and brake are shown together on the same 0% to 100% scale. Throttle is green and brake is red. Solid lines are the completed comparison lap, dashed lines are the reference lap, and dot-dash lines are the running live lap. These fixed colors and line styles replace a separate legend."""
 STEERING_DIAGRAM = """The mean of the front-left and front-right wheel steering angles, shown in degrees. This data is available when laps are recorded with packet format C. The chart starts at a symmetric ±10° scale and expands in 5° steps when needed.
 
 """ + LAP_LINE_STYLES

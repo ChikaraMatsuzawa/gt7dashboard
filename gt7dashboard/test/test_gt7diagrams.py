@@ -106,6 +106,18 @@ class TestHelper(unittest.TestCase):
         rd.window_select.value = "500"
         self.assertEqual(500, rd.analysis_range.end - rd.analysis_range.start)
 
+    def test_analysis_domain_waits_for_a_positive_live_distance(self):
+        rd = gt7diagrams.RaceDiagram(600)
+
+        rd.update_analysis_domain([0.0])
+
+        self.assertEqual(0.0, rd._lap_distance_max)
+        self.assertEqual((0, None), rd.full_lap_range.bounds)
+
+        rd.update_analysis_domain([0.0, 0.5])
+        self.assertEqual(0.5, rd._lap_distance_max)
+        self.assertEqual((0, 0.5), rd.full_lap_range.bounds)
+
     def test_throttle_and_brake_share_positive_axis(self):
         rd = gt7diagrams.RaceDiagram(600)
 
@@ -114,6 +126,38 @@ class TestHelper(unittest.TestCase):
         self.assertEqual(100, rd.f_pedal_inputs.y_range.end)
         self.assertEqual("throttle", rd.throttle_lines[0].glyph.y)
         self.assertEqual("brake", rd.braking_lines[0].glyph.y)
+
+    def test_live_lap_has_its_own_streaming_sources(self):
+        rd = gt7diagrams.RaceDiagram(600)
+        lap = self.test_laps[0]
+        lap_data = lap.get_data_dict()
+
+        self.assertEqual(4, rd.number_of_default_laps)
+        self.assertEqual(4, len(rd.speed_lines))
+        self.assertEqual(4, len(rd.throttle_lines))
+
+        first_chunk_size = 20
+        first_chunk = {
+            key: values[:first_chunk_size]
+            for key, values in lap_data.items()
+        }
+        rd.source_live_lap.stream(first_chunk)
+        self.assertEqual(
+            first_chunk_size, len(rd.source_live_lap.data["speed"])
+        )
+        self.assertEqual(
+            first_chunk_size, len(rd.source_live_lap.data["distance"])
+        )
+
+        rd.source_live_time_diff.data = {
+            "distance": [0],
+            "timedelta": [0],
+            "reference": [0],
+            "comparison": [0],
+        }
+        rd.clear_live_telemetry()
+        self.assertEqual([], rd.source_live_lap.data["speed"])
+        self.assertEqual([], rd.source_live_time_diff.data["distance"])
 
     def test_compact_plot_chrome_uses_one_primary_distance_axis(self):
         rd = gt7diagrams.RaceDiagram(600)

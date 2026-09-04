@@ -128,6 +128,20 @@ class TestHelper(unittest.TestCase):
 
         print(len(df))
 
+    def test_calculate_time_diff_normalizes_each_lap_time_origin(self):
+        reference_lap = Lap()
+        reference_lap.data_speed = [0, 60, 60, 60]
+        reference_lap.data_time = [-132.0, -131.0, -130.0, -129.0]
+
+        comparison_lap = Lap()
+        comparison_lap.data_speed = [0, 60, 60, 60]
+        comparison_lap.data_time = [0.0, 1.0, 2.0, 3.0]
+
+        df = calculate_time_diff_by_distance(reference_lap, comparison_lap)
+        delta_ms = df["timedelta"].dt.total_seconds() * 1000
+
+        self.assertLess(delta_ms.abs().max(), 0.001)
+
     def test_convert_seconds_to_milliseconds(self):
         seconds = 10000
         ms = gt7helper.convert_seconds_to_milliseconds(seconds)

@@ -8,7 +8,7 @@ import time
 import copy
 import traceback
 from datetime import timedelta
-from threading import Thread
+from threading import RLock, Thread
 from typing import List
 
 from Crypto.Cipher import Salsa20
@@ -241,6 +241,13 @@ class GT7Communication(Thread):
         # True will always quit with the main process
         self.daemon = True
 
+        # The UDP receiver writes a lap while Bokeh reads it from its own
+        # event-loop thread.  Keep every published snapshot internally
+        # consistent: all telemetry arrays must have the same sample count.
+        self._state_lock = RLock()
+        self._current_lap_generation = 0
+        self._current_lap_revision = 0
+
         # Set lap callback function as none
         self.lap_callback_function = None
 
@@ -263,6 +270,45 @@ class GT7Communication(Thread):
 
     def stop(self):
         self._shall_run = False
+
+    def _start_current_lap_unlocked(self, fuel_at_start=None):
+        """Start a new live-lap generation while the state lock is held."""
+        self._current_lap_generation += 1
+        self._current_lap_revision = 0
+        self.current_lap = Lap()
+        if fuel_at_start is not None:
+            self.current_lap.fuel_at_start = fuel_at_start
+
+    def _prepare_lap_for_packet_unlocked(
+        self, current_lap_number, best_lap, last_lap, previous_lap
+    ):
+        """Return the next lap number, callback payload, and log decision.
+
+        GT7 continues to emit packets while in menus and before a session
+        starts. Those packets commonly report lap 0. They are not a lap
+        boundary: resetting the running lap for every one of them made the
+        live Bokeh sources redraw continuously.
+        """
+        is_recording = self.last_data.in_race or self.always_record_data
+        has_active_lap = is_recording and current_lap_number > 0
+
+        if not has_active_lap:
+            # Clear a previously active live lap once, then remain idle until
+            # GT7 reports a positive lap number again.
+            if self.current_lap.data_speed:
+                self._start_current_lap_unlocked()
+            return -1, None, False
+
+        callback_lap = None
+        if current_lap_number != previous_lap:
+            self.session.special_packet_time += (
+                last_lap - self.current_lap.lap_ticks * 1000.0 / 60.0
+            )
+            self.session.best_lap = best_lap
+            callback_lap = self._finish_lap_unlocked()
+
+        return current_lap_number, callback_lap, True
+
     def run(self):
         while self._shall_run:
             s = None
@@ -289,36 +335,33 @@ class GT7Communication(Thread):
 
                         self.last_packet_format = PACKET_FORMATS_BY_SIZE[len(data)][0]
                         if struct.unpack('i', ddata[0x70:0x70 + 4])[0] > package_id:
+                            callback_lap = None
+                            with self._state_lock:
+                                self.last_data = GTData(ddata)
+                                self._last_time_data_received = time.time()
 
-                            self.last_data = GTData(ddata)
-                            self._last_time_data_received = time.time()
+                                package_id = struct.unpack('i', ddata[0x70:0x70 + 4])[0]
 
-                            package_id = struct.unpack('i', ddata[0x70:0x70 + 4])[0]
+                                bstlap = struct.unpack('i', ddata[0x78:0x78 + 4])[0]
+                                lstlap = struct.unpack('i', ddata[0x7C:0x7C + 4])[0]
+                                curlap = struct.unpack('h', ddata[0x74:0x74 + 2])[0]
 
-                            bstlap = struct.unpack('i', ddata[0x78:0x78 + 4])[0]
-                            lstlap = struct.unpack('i', ddata[0x7C:0x7C + 4])[0]
-                            curlap = struct.unpack('h', ddata[0x74:0x74 + 2])[0]
+                                if curlap == 0:
+                                    self.session.special_packet_time = 0
 
-                            if curlap == 0:
-                                self.session.special_packet_time = 0
+                                (
+                                    previous_lap,
+                                    callback_lap,
+                                    should_log_data,
+                                ) = self._prepare_lap_for_packet_unlocked(
+                                    curlap, bstlap, lstlap, previous_lap
+                                )
 
-                            if curlap > 0 and (self.last_data.in_race or self.always_record_data):
+                                if should_log_data:
+                                    self._log_data_unlocked(self.last_data)
 
-                                if curlap != previous_lap:
-                                    # New lap
-                                    previous_lap = curlap
-
-                                    self.session.special_packet_time += lstlap - self.current_lap.lap_ticks * 1000.0 / 60.0
-                                    self.session.best_lap = bstlap
-
-                                    self.finish_lap()
-
-                            else:
-                                curLapTime = 0
-                                # Reset lap
-                                self.current_lap = Lap()
-
-                            self._log_data(self.last_data)
+                            if callback_lap is not None:
+                                self._notify_lap_callback(callback_lap)
 
                             if package_nr > 100:
                                 self._send_hb(s)
@@ -342,34 +385,58 @@ class GT7Communication(Thread):
         self._shall_restart = True
 
     def is_connected(self) -> bool:
-        return self._last_time_data_received > 0 and (time.time() - self._last_time_data_received) <= 1
+        with self._state_lock:
+            last_received = self._last_time_data_received
+        return last_received > 0 and (time.time() - last_received) <= 1
 
     def _send_hb(self, s):
         send_data = self.packet_format
         s.sendto(send_data.encode('utf-8'), (self.playstation_ip, self.send_port))
 
     def get_last_data(self) -> GTData:
-        timeout = time.time() + 5  # 5 seconds timeout
-        while True:
-
-            if self.last_data is not None:
-                return self.last_data
-
-            if time.time() > timeout:
-                break
+        with self._state_lock:
+            return copy.copy(self.last_data)
 
     def get_laps(self) -> List[Lap]:
-        return self.laps
+        # Finished Lap instances are immutable from this point on; copying the
+        # list is sufficient to prevent a concurrent insert from affecting a
+        # Bokeh update.
+        with self._state_lock:
+            return self.laps.copy()
+
+    def get_session_snapshot(self) -> Session:
+        with self._state_lock:
+            return copy.copy(self.session)
+
+    def get_live_lap_snapshot(self):
+        """Return one self-consistent, detached running-lap snapshot.
+
+        The generation changes whenever a new lap begins. The revision changes
+        after a complete telemetry sample has been appended, allowing every
+        Bokeh session to stream only the samples it has not seen yet.
+        """
+        with self._state_lock:
+            return (
+                self._current_lap_generation,
+                self._current_lap_revision,
+                copy.deepcopy(self.current_lap),
+                copy.copy(self.last_data),
+            )
 
     def load_laps(self, laps: List[Lap], to_last_position = False, to_first_position = False, replace_other_laps = False):
-        if to_last_position:
-            self.laps = self.laps + laps
-        elif to_first_position:
-            self.laps = laps + self.laps
-        elif replace_other_laps:
-            self.laps = laps
+        with self._state_lock:
+            if to_last_position:
+                self.laps = self.laps + laps
+            elif to_first_position:
+                self.laps = laps + self.laps
+            elif replace_other_laps:
+                self.laps = laps
 
     def _log_data(self, data):
+        with self._state_lock:
+            self._log_data_unlocked(data)
+
+    def _log_data_unlocked(self, data):
 
         if not (data.in_race or self.always_record_data):
             return
@@ -515,7 +582,17 @@ class GT7Communication(Thread):
 
         self.current_lap.car_id = data.car_id
 
+        # Increment only after every series has received this sample.
+        self._current_lap_revision += 1
+
     def finish_lap(self, manual=False):
+        with self._state_lock:
+            callback_lap = self._finish_lap_unlocked(manual=manual)
+
+        if callback_lap is not None:
+            self._notify_lap_callback(callback_lap)
+
+    def _finish_lap_unlocked(self, manual=False):
         """
         Finishes a lap with info we only know after crossing the line after each lap
         """
@@ -550,29 +627,44 @@ class GT7Communication(Thread):
         # We will only persist those laps that have crossed the starting line at least once
         # And those laps which have data for speed logged. This will prevent empty laps.
         # TODO Correct this comment, this is about Laptime not lap numbers
+        callback_lap = None
         if self.current_lap.lap_finish_time > 0 and len(self.current_lap.data_speed) > 0:
             self.laps.insert(0, self.current_lap)
 
-            # Make a copy of this lap and call the callback function if set
+            # Copy while synchronized, but invoke callbacks after releasing the
+            # receiver lock so external work cannot stall telemetry ingestion.
             if self.lap_callback_function:
-                self.lap_callback_function(copy.deepcopy(self.current_lap))
+                callback_lap = copy.deepcopy(self.current_lap)
 
-        # Reset current lap with an empty one
-        self.current_lap = Lap()
-        self.current_lap.fuel_at_start = self.last_data.current_fuel
+        self._start_current_lap_unlocked(
+            fuel_at_start=self.last_data.current_fuel
+        )
+        return callback_lap
+
+    def _notify_lap_callback(self, lap):
+        with self._state_lock:
+            callback = self.lap_callback_function
+        if callback:
+            callback(lap)
 
 
     def reset(self):
         """
         Resets the current lap, all stored laps and the current session.
         """
-        self.current_lap = Lap()
-        self.session = Session()
-        self.last_data = GTData(None)
-        self.laps = []
+        with self._state_lock:
+            self._start_current_lap_unlocked()
+            self.session = Session()
+            self.last_data = GTData(None)
+            self.laps = []
 
     def set_lap_callback(self, new_lap_callback):
-        self.lap_callback_function = new_lap_callback
+        with self._state_lock:
+            self.lap_callback_function = new_lap_callback
+
+    def set_always_record_data(self, enabled: bool):
+        with self._state_lock:
+            self.always_record_data = enabled
 
 
 # Data stream decoding. The UDP datagram length identifies the requested

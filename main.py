@@ -49,6 +49,9 @@ from gt7dashboard.gt7lap import Lap
 logger = logging.getLogger('main.py')
 logger.setLevel(logging.DEBUG)
 
+LIVE_TELEMETRY_INTERVAL_MS = 250
+LIVE_TIME_DIFF_INTERVAL_SECONDS = 1.0
+
 
 def update_connection_info():
     div_connection_info.text = ""
@@ -71,11 +74,12 @@ def update_fuel_map(step):
     if g_display_mode == "comparison":
         return
 
-    if len(app.gt7comm.laps) == 0:
+    laps = app.gt7comm.get_laps()
+    if len(laps) == 0:
         div_fuel_map.text = ""
         return
 
-    last_lap = app.gt7comm.laps[0]
+    last_lap = laps[0]
 
     if last_lap == g_stored_fuel_map:
         return
@@ -84,6 +88,152 @@ def update_fuel_map(step):
 
     # TODO Add real live data during a lap
     div_fuel_map.text = gt7diagrams.get_fuel_map_html_table(last_lap)
+
+
+def _empty_time_diff_data():
+    return {
+        "distance": [],
+        "timedelta": [],
+        "reference": [],
+        "comparison": [],
+    }
+
+
+def _live_lap_elapsed_ms(lap: Lap) -> float:
+    """Prefer packet-C's live clock, with the packet-tick clock as fallback."""
+    for value in reversed(getattr(lap, "data_current_lap_time_ms", [])):
+        if value is not None:
+            try:
+                return max(0.0, float(value))
+            except (TypeError, ValueError):
+                pass
+    return max(0.0, lap.lap_live_time * 1000)
+
+
+def _update_live_status(lap: Lap, last_data):
+    sample_count = len(lap.data_speed)
+    if sample_count == 0:
+        div_live_status.text = (
+            "<span style='color:#64748b;'>Live telemetry: waiting for a lap</span>"
+        )
+        return
+
+    elapsed = gt7helper.seconds_to_lap_time(_live_lap_elapsed_ms(lap) / 1000)
+    lap_number = getattr(last_data, "current_lap", None)
+    lap_label = f"Lap {lap_number}" if lap_number is not None else "Live lap"
+    fuel = getattr(last_data, "current_fuel", None)
+    fuel_label = ""
+    if fuel is not None:
+        try:
+            fuel_label = f" · {float(fuel):.1f} L"
+        except (TypeError, ValueError):
+            pass
+    div_live_status.text = (
+        "<span style='color:#b45309;'><b>● Live</b></span> "
+        f"{lap_label} · {elapsed}{fuel_label}"
+    )
+
+
+def _stream_live_lap_data(lap_data, start_index):
+    """Return complete ColumnDataSource columns for samples after start_index."""
+    return {
+        key: list(values[start_index:])
+        for key, values in lap_data.items()
+    }
+
+
+def clear_live_telemetry_display():
+    """Clear only the running-lap overlay and its per-session cursors."""
+    global g_live_lap_generation
+    global g_live_lap_revision
+    global g_live_sample_count
+    global g_live_time_diff_updated_at
+
+    race_diagram.clear_live_telemetry()
+    g_live_lap_generation = None
+    g_live_lap_revision = -1
+    g_live_sample_count = 0
+    g_live_time_diff_updated_at = 0.0
+    div_live_status.text = (
+        "<span style='color:#64748b;'>Live telemetry: waiting for a lap</span>"
+    )
+
+
+def _live_reference_lap():
+    laps = app.gt7comm.get_laps()
+    if not laps:
+        return None
+    return gt7helper.get_last_reference_median_lap(
+        laps, reference_lap_selected=g_reference_lap_selected
+    )[1]
+
+
+def update_live_telemetry():
+    """Stream a detached current-lap snapshot into the Bokeh session.
+
+    The UDP worker never touches Bokeh objects. Each browser session polls a
+    consistent snapshot and sends only telemetry samples it has not rendered.
+    """
+    global g_live_lap_generation
+    global g_live_lap_revision
+    global g_live_sample_count
+    global g_live_time_diff_updated_at
+
+    if g_display_mode != "live":
+        return
+
+    generation, revision, live_lap, last_data = app.gt7comm.get_live_lap_snapshot()
+    if generation != g_live_lap_generation or revision < g_live_lap_revision:
+        race_diagram.clear_live_telemetry()
+        g_live_lap_generation = generation
+        g_live_lap_revision = -1
+        g_live_sample_count = 0
+        g_live_time_diff_updated_at = 0.0
+
+    if revision == g_live_lap_revision:
+        return
+
+    live_lap_data = live_lap.get_data_dict()
+    sample_count = len(live_lap_data["speed"])
+    if sample_count < g_live_sample_count:
+        race_diagram.clear_live_telemetry()
+        g_live_sample_count = 0
+        g_live_time_diff_updated_at = 0.0
+
+    if sample_count > g_live_sample_count:
+        new_samples = _stream_live_lap_data(live_lap_data, g_live_sample_count)
+        race_diagram.source_live_lap.stream(new_samples)
+        # Keep a completed lap's full-course navigator available while the
+        # current lap starts again at zero distance.
+        analysis_distances = list(
+            race_diagram.source_last_lap.data["distance"]
+        ) + list(race_diagram.source_live_lap.data["distance"])
+        race_diagram.update_analysis_domain(
+            analysis_distances
+        )
+        race_diagram.update_steering_visibility()
+        linked_race_line.update_laps(
+            race_diagram.source_live_lap.data,
+            race_diagram.source_reference_lap.data,
+        )
+        g_live_sample_count = sample_count
+
+    now = time.monotonic()
+    if now - g_live_time_diff_updated_at >= LIVE_TIME_DIFF_INTERVAL_SECONDS:
+        reference_lap = _live_reference_lap()
+        if reference_lap and sample_count > 1 and len(reference_lap.data_speed) > 1:
+            live_distance = live_lap_data["distance"][-1]
+            race_diagram.source_live_time_diff.data = (
+                calculate_time_diff_by_distance(
+                    reference_lap, live_lap, max_distance=live_distance
+                )
+            )
+        else:
+            race_diagram.source_live_time_diff.data = _empty_time_diff_data()
+        g_live_time_diff_updated_at = now
+
+    _update_live_status(live_lap, last_data)
+    g_live_lap_revision = revision
 
 
 def update_race_lines(laps: List[Lap], reference_lap: Lap):
@@ -154,9 +304,10 @@ def update_lap_change():
 
     laps = app.gt7comm.get_laps()
 
-    if app.gt7comm.session != g_session_stored:
-        update_tuning_info()
-        g_session_stored = copy.copy(app.gt7comm.session)
+    session = app.gt7comm.get_session_snapshot()
+    if session != g_session_stored:
+        update_tuning_info(session)
+        g_session_stored = session
 
     if app.gt7comm.is_connected() != g_connection_status_stored:
         update_connection_info()
@@ -283,17 +434,8 @@ def update_speed_velocity_graph(laps: List[Lap]):
         update_break_points(reference_lap, s_race_line, "magenta")
 
 
-def _empty_time_diff_data():
-    return {
-        "distance": [],
-        "timedelta": [],
-        "reference": [],
-        "comparison": [],
-    }
-
-
 def clear_comparison_diagrams():
-    """Clear a previously active saved-file comparison without touching live laps."""
+    """Clear comparison artifacts before returning diagram ownership to live data."""
     global g_stored_fuel_map
 
     empty_lap_data = Lap().get_data_dict()
@@ -302,6 +444,7 @@ def clear_comparison_diagrams():
     race_diagram.source_reference_lap.data = empty_lap_data
     race_diagram.source_median_lap.data = empty_lap_data
     race_diagram.source_time_diff.data = _empty_time_diff_data()
+    clear_live_telemetry_display()
     race_diagram.clear_analysis_domain()
     race_diagram.update_steering_visibility()
     linked_race_line.update_laps(None, None)
@@ -325,6 +468,7 @@ def restore_live_display():
     g_display_mode = "live"
     g_telemetry_update_needed = True
     update_lap_change()
+    update_live_telemetry()
 
 
 def render_saved_lap_comparison(
@@ -345,6 +489,10 @@ def render_saved_lap_comparison(
     race_diagram.source_last_lap.data = comparison_data
     race_diagram.source_reference_lap.data = reference_data
     race_diagram.source_median_lap.data = Lap().get_data_dict()
+    clear_live_telemetry_display()
+    div_live_status.text = (
+        "<span style='color:#64748b;'>Live telemetry: paused during saved-lap comparison</span>"
+    )
     race_diagram.source_time_diff.data = calculate_time_diff_by_distance(
         reference_lap,
         comparison_lap,
@@ -420,27 +568,28 @@ def reset_button_handler(event):
 
     app.gt7comm.load_laps([], replace_other_laps=True)
     app.gt7comm.reset()
+    clear_live_telemetry_display()
     g_telemetry_update_needed = True
 
 
 def always_record_checkbox_handler(event, old, new):
-    if len(new) == 2:
-        logger.info("Set always record data to True")
-        app.gt7comm.always_record_data = True
-    else:
-        logger.info("Set always record data to False")
-        app.gt7comm.always_record_data = False
+    enabled = 0 in new
+    logger.info("Set always record data to %s", enabled)
+    app.gt7comm.set_always_record_data(enabled)
 
 
 def log_lap_button_handler(event):
     app.gt7comm.finish_lap(manual=True)
-    logger.info("Added a lap manually to the list of laps: %s" % app.gt7comm.laps[0])
+    laps = app.gt7comm.get_laps()
+    if laps:
+        logger.info("Added a lap manually to the list of laps: %s" % laps[0])
 
 
 def save_button_handler(event):
-    if len(app.gt7comm.laps) > 0:
-        path = save_laps_to_json(app.gt7comm.laps)
-        logger.info("Saved %d laps as %s" % (len(app.gt7comm.laps), path))
+    laps = app.gt7comm.get_laps()
+    if laps:
+        path = save_laps_to_json(laps)
+        logger.info("Saved %d laps as %s" % (len(laps), path))
         refresh_saved_lap_file_options()
 
 
@@ -702,12 +851,12 @@ def toggle_comparison_panel_handler():
 
 
 
-def update_tuning_info():
+def update_tuning_info(session):
     div_tuning_info.text = """<h4>Tuning Info</h4>
     <p>Max Speed: <b>%d</b> kph</p>
     <p>Min Body Height: <b>%d</b> mm</p>""" % (
-        app.gt7comm.session.max_speed,
-        app.gt7comm.session.min_body_height,
+        session.max_speed,
+        session.min_body_height,
     )
 
 def get_race_lines_layout(number_of_race_lines):
@@ -779,6 +928,10 @@ g_reference_lap_selected = None
 g_stored_fuel_map = None
 g_telemetry_update_needed = False
 g_display_mode = "live"
+g_live_lap_generation = None
+g_live_lap_revision = -1
+g_live_sample_count = 0
+g_live_time_diff_updated_at = 0.0
 g_comparison_records: List[gt7comparison.ComparisonLap] = []
 g_comparison_records_by_id: dict[str, gt7comparison.ComparisonLap] = {}
 g_comparison_overlay_ids: List[str] = []
@@ -977,6 +1130,11 @@ div_tuning_info = Div(width=200, height=100)
 div_speed_peak_valley_diagram = Div(width=200, height=125)
 div_gt7_dashboard = Div(width=120, height=30)
 div_header_line = Div(width=400, height=30)
+div_live_status = Div(
+    text="<span style='color:#64748b;'>Live telemetry: waiting for a lap</span>",
+    width=240,
+    height=30,
+)
 div_connection_info = Div(width=30, height=30)
 div_deviance_laps_on_display = Div(width=200, height=race_diagram.f_speed_variance.height)
 
@@ -986,7 +1144,7 @@ div_gt7_dashboard.text = f"<a href='https://github.com/snipem/gt7dashboard' targ
 
 LABELS = ["Record Replays"]
 
-checkbox_group = CheckboxGroup(labels=LABELS, active=[1])
+checkbox_group = CheckboxGroup(labels=LABELS, active=[])
 checkbox_group.on_change("active", always_record_checkbox_handler)
 
 race_time_table.t_lap_times.sizing_mode = "stretch_width"
@@ -1016,6 +1174,7 @@ header_controls = row(
     div_connection_info,
     div_gt7_dashboard,
     div_header_line,
+    div_live_status,
     reset_button,
     save_button,
     select_title,
@@ -1151,6 +1310,8 @@ tabs = Tabs(tabs=[tab1, tab2, tab3])
 curdoc().add_root(tabs)
 curdoc().title = "GT7 Dashboard"
 
-# This will only trigger once per lap, but we check every second if anything happened
+# Finished-lap analysis remains low-frequency; live telemetry is streamed
+# separately so the dashboard reacts during a lap without blocking reception.
 curdoc().add_periodic_callback(update_lap_change, 1000)
 curdoc().add_periodic_callback(update_fuel_map, 5000)
+curdoc().add_periodic_callback(update_live_telemetry, LIVE_TELEMETRY_INTERVAL_MS)

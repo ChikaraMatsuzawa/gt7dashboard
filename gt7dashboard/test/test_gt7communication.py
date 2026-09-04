@@ -209,6 +209,45 @@ class PacketDecoderTest(unittest.TestCase):
         self.assertAlmostEqual(2.65, lap.wheel_base_m, places=6)
         self.assertEqual('GR3', lap.car_category)
 
+    def test_always_record_data_captures_replay_packets(self):
+        communication = gt7communication.GT7Communication('192.0.2.1')
+        data = gt7communication.GTData(
+            gt7communication.salsa20_dec(packet_for_format('A'))
+        )
+        data.in_race = False
+        data.current_lap = 1
+
+        communication._log_data(data)
+        self.assertEqual([], communication.current_lap.data_speed)
+
+        communication.set_always_record_data(True)
+        communication._log_data(data)
+        self.assertEqual(1, len(communication.current_lap.data_speed))
+
+    def test_inactive_packets_only_clear_a_live_lap_once(self):
+        communication = gt7communication.GT7Communication('192.0.2.1')
+        communication.set_always_record_data(True)
+        data = gt7communication.GTData(
+            gt7communication.salsa20_dec(packet_for_format('A'))
+        )
+        data.in_race = False
+        data.current_lap = 1
+        communication.last_data = data
+        communication._log_data(data)
+        generation_before_idle = communication._current_lap_generation
+
+        previous_lap, callback_lap, should_log_data = (
+            communication._prepare_lap_for_packet_unlocked(0, 0, 0, 1)
+        )
+        self.assertEqual(-1, previous_lap)
+        self.assertIsNone(callback_lap)
+        self.assertFalse(should_log_data)
+        self.assertEqual(generation_before_idle + 1, communication._current_lap_generation)
+        self.assertEqual([], communication.current_lap.data_speed)
+
+        communication._prepare_lap_for_packet_unlocked(0, 0, 0, previous_lap)
+        self.assertEqual(generation_before_idle + 1, communication._current_lap_generation)
+
     def test_packet_format_selects_heartbeat(self):
         socket = RecordingSocket()
         communication = gt7communication.GT7Communication('192.0.2.1', 'C')
@@ -248,6 +287,44 @@ class PacketDecoderTest(unittest.TestCase):
         lap.discard_unavailable_extension_data()
         self.assertEqual([], lap.data_surface_type_fl)
         self.assertEqual([1.25], lap.data_wheel_rotation_rad)
+
+    def test_live_lap_snapshot_is_consistent_and_detached(self):
+        communication = gt7communication.GT7Communication('192.0.2.1')
+        data = gt7communication.GTData(
+            gt7communication.salsa20_dec(packet_for_format('A'))
+        )
+        data.in_race = True
+        communication._log_data(data)
+
+        generation, revision, snapshot, last_data = (
+            communication.get_live_lap_snapshot()
+        )
+        self.assertEqual(0, generation)
+        self.assertEqual(1, revision)
+        self.assertEqual(1, len(snapshot.data_speed))
+        self.assertIsNot(last_data, communication.last_data)
+
+        snapshot.data_speed[0] = 999
+        _, next_revision, next_snapshot, _ = communication.get_live_lap_snapshot()
+        self.assertEqual(1, next_revision)
+        self.assertNotEqual(999, next_snapshot.data_speed[0])
+
+        communication.reset()
+        next_generation, next_revision, next_snapshot, _ = (
+            communication.get_live_lap_snapshot()
+        )
+        self.assertGreater(next_generation, generation)
+        self.assertEqual(0, next_revision)
+        self.assertEqual([], next_snapshot.data_speed)
+
+    def test_get_laps_returns_a_copy_of_the_shared_list(self):
+        communication = gt7communication.GT7Communication('192.0.2.1')
+        communication.load_laps([Lap()], replace_other_laps=True)
+
+        displayed_laps = communication.get_laps()
+        displayed_laps.clear()
+
+        self.assertEqual(1, len(communication.get_laps()))
 
 
 @unittest.skipUnless(
