@@ -25,7 +25,7 @@ The checkbox 'Record Replays' will allow you to record replays. Be careful since
 
 In the 'Best Lap' dropdown list you can select the reference lap. Usually this will point to the best lap of the session.
 
-Use 'Compare Saved Files' to choose multiple saved JSON files, then select an explicit reference lap and comparison lap. You can select up to two more rows as graph overlays.
+Use 'Compare Saved Files' to choose multiple saved JSON files. 'Live saved reference' keeps one loaded lap as the magenta reference while packet-driven live telemetry continues to update; clear it to return to the session reference. For a static comparison, select an explicit reference lap and comparison lap. You can select up to two more rows as graph overlays.
 """
 
 TIME_DIFF = """This is a graph for showing the relative time difference between the comparison lap and the reference lap.

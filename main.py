@@ -4,7 +4,7 @@ import itertools
 import logging
 import os
 import time
-from typing import List
+from typing import List, Optional
 
 import bokeh.application
 from bokeh.driving import linear
@@ -160,7 +160,16 @@ def clear_live_telemetry_display():
 
 
 def _live_reference_lap():
-    laps = app.gt7comm.get_laps()
+    return _active_reference_lap()
+
+
+def _active_reference_lap(laps: Optional[List[Lap]] = None) -> Optional[Lap]:
+    """Resolve the reference without putting saved laps into live telemetry."""
+    if g_live_saved_reference is not None:
+        return g_live_saved_reference.lap
+
+    if laps is None:
+        laps = app.gt7comm.get_laps()
     if not laps:
         return None
     return gt7helper.get_last_reference_median_lap(
@@ -204,10 +213,13 @@ def update_live_telemetry():
         new_samples = _stream_live_lap_data(live_lap_data, g_live_sample_count)
         race_diagram.source_live_lap.stream(new_samples)
         # Keep a completed lap's full-course navigator available while the
-        # current lap starts again at zero distance.
+        # current lap starts again at zero distance. A saved live reference
+        # also keeps the full circuit visible before a lap is completed.
         analysis_distances = list(
             race_diagram.source_last_lap.data["distance"]
-        ) + list(race_diagram.source_live_lap.data["distance"])
+        ) + list(race_diagram.source_reference_lap.data["distance"]) + list(
+            race_diagram.source_live_lap.data["distance"]
+        )
         race_diagram.update_analysis_domain(
             analysis_distances
         )
@@ -223,11 +235,18 @@ def update_live_telemetry():
         reference_lap = _live_reference_lap()
         if reference_lap and sample_count > 1 and len(reference_lap.data_speed) > 1:
             live_distance = live_lap_data["distance"][-1]
-            race_diagram.source_live_time_diff.data = (
-                calculate_time_diff_by_distance(
-                    reference_lap, live_lap, max_distance=live_distance
-                )
+            shared_distance = min(
+                float(live_distance),
+                gt7comparison.get_lap_distance(reference_lap),
             )
+            if shared_distance > 0:
+                race_diagram.source_live_time_diff.data = (
+                    calculate_time_diff_by_distance(
+                        reference_lap, live_lap, max_distance=shared_distance
+                    )
+                )
+            else:
+                race_diagram.source_live_time_diff.data = _empty_time_diff_data()
         else:
             race_diagram.source_live_time_diff.data = _empty_time_diff_data()
         g_live_time_diff_updated_at = now
@@ -324,24 +343,26 @@ def update_lap_change():
 
     logger.debug("Rerendering laps")
 
-    reference_lap = Lap()
+    reference_lap = _active_reference_lap(laps) or Lap()
 
     if len(laps) > 0:
 
         last_lap = laps[0]
 
-        if len(laps) > 1:
-            reference_lap = gt7helper.get_last_reference_median_lap(
-                laps, reference_lap_selected=g_reference_lap_selected
-            )[1]
-
+        if len(reference_lap.data_speed) > 0:
             div_speed_peak_valley_diagram.text = get_speed_peak_and_valley_diagram(last_lap, reference_lap)
 
         update_header_line(div_header_line, last_lap, reference_lap)
     else:
         # A saved-file comparison may have been cleared while no live laps are
         # available yet. Do not leave its labels or fuel table on screen.
-        div_header_line.text = ""
+        if g_live_saved_reference:
+            div_header_line.text = (
+                "<b>Live Reference:</b> "
+                f"{html.escape(g_live_saved_reference.select_label)}"
+            )
+        else:
+            div_header_line.text = ""
         div_speed_peak_valley_diagram.text = ""
         div_deviance_laps_on_display.text = ""
         div_fuel_map.text = ""
@@ -372,22 +393,32 @@ def update_lap_change():
 
 
 def update_speed_velocity_graph(laps: List[Lap]):
-    last_lap, reference_lap, median_lap = gt7helper.get_last_reference_median_lap(
+    last_lap, _, median_lap = gt7helper.get_last_reference_median_lap(
         laps, reference_lap_selected=g_reference_lap_selected
     )
+    reference_lap = _active_reference_lap(laps)
 
     last_lap_data = None
     reference_lap_data = None
+    if reference_lap and len(reference_lap.data_speed) > 0:
+        reference_lap_data = reference_lap.get_data_dict()
+        race_diagram.source_reference_lap.data = reference_lap_data
 
     if last_lap:
         last_lap_data = last_lap.get_data_dict()
         race_diagram.source_last_lap.data = last_lap_data
-        race_diagram.update_analysis_domain(last_lap_data["distance"])
 
-        if reference_lap and len(reference_lap.data_speed) > 0:
-            reference_lap_data = reference_lap.get_data_dict()
-            race_diagram.source_time_diff.data = calculate_time_diff_by_distance(reference_lap, last_lap)
-            race_diagram.source_reference_lap.data = reference_lap_data
+        if reference_lap_data:
+            shared_distance = min(
+                gt7comparison.get_lap_distance(reference_lap),
+                gt7comparison.get_lap_distance(last_lap),
+            )
+            if shared_distance > 0:
+                race_diagram.source_time_diff.data = calculate_time_diff_by_distance(
+                    reference_lap, last_lap, max_distance=shared_distance
+                )
+            else:
+                race_diagram.source_time_diff.data = _empty_time_diff_data()
         else:
             race_diagram.source_time_diff.data = {
                 "distance": [],
@@ -396,16 +427,24 @@ def update_speed_velocity_graph(laps: List[Lap]):
                 "comparison": [],
             }
             race_diagram.source_reference_lap.data = Lap().get_data_dict()
+
+        analysis_distances = list(last_lap_data["distance"])
+        if reference_lap_data:
+            analysis_distances += list(reference_lap_data["distance"])
+        race_diagram.update_analysis_domain(analysis_distances)
     else:
         race_diagram.source_last_lap.data = Lap().get_data_dict()
-        race_diagram.source_reference_lap.data = Lap().get_data_dict()
-        race_diagram.clear_analysis_domain()
         race_diagram.source_time_diff.data = {
             "distance": [],
             "timedelta": [],
             "reference": [],
             "comparison": [],
         }
+        if reference_lap_data:
+            race_diagram.update_analysis_domain(reference_lap_data["distance"])
+        else:
+            race_diagram.source_reference_lap.data = Lap().get_data_dict()
+            race_diagram.clear_analysis_domain()
 
     if median_lap:
         race_diagram.source_median_lap.data = median_lap.get_data_dict()
@@ -761,8 +800,70 @@ def comparison_table_selection_handler(attr, old, new):
     update_saved_lap_comparison()
 
 
+def _refresh_live_reference_display(*, restore_from_comparison: bool = False):
+    """Redraw live diagrams after the saved reference changes."""
+    global g_telemetry_update_needed
+    global g_live_lap_revision
+    global g_live_time_diff_updated_at
+
+    if g_display_mode == "comparison":
+        if restore_from_comparison:
+            restore_live_display()
+        return
+
+    g_telemetry_update_needed = True
+    update_lap_change()
+    # The current snapshot may not receive another packet before the next
+    # periodic callback. Force its delta to be recomputed against the newly
+    # selected reference immediately.
+    g_live_lap_revision = -1
+    g_live_time_diff_updated_at = 0.0
+    update_live_telemetry()
+
+
+def live_saved_reference_handler(attr, old, new):
+    """Use one loaded saved lap as the reference without pausing telemetry."""
+    global g_live_saved_reference
+    global g_comparison_widgets_updating
+
+    if g_comparison_widgets_updating:
+        return
+
+    record = _comparison_record(new)
+    if new and (record is None or not record.has_telemetry):
+        g_live_saved_reference = None
+        g_comparison_widgets_updating = True
+        live_saved_reference_select.value = ""
+        g_comparison_widgets_updating = False
+        set_comparison_status(
+            "The selected saved lap has no usable telemetry for a live reference.",
+            "error",
+        )
+        _refresh_live_reference_display()
+        return
+
+    g_live_saved_reference = record
+    _refresh_live_reference_display(restore_from_comparison=record is not None)
+
+    if record is None:
+        set_comparison_status("Live saved reference cleared.")
+    else:
+        set_comparison_status(
+            f"Live telemetry now uses {record.select_label} as the reference.",
+            "success",
+        )
+
+
+def clear_live_saved_reference_handler():
+    if live_saved_reference_select.value:
+        live_saved_reference_select.value = ""
+    else:
+        live_saved_reference_handler("value", "", "")
+
+
 def _reset_comparison_role_widgets():
     global g_comparison_widgets_updating
+    global g_live_saved_reference
 
     g_comparison_widgets_updating = True
     options = [("", "Choose a lap")] + [
@@ -774,6 +875,24 @@ def _reset_comparison_role_widgets():
     comparison_reference_select.value = ""
     comparison_lap_select.value = ""
     comparison_lap_source.selected.indices = []
+
+    live_reference_options = [("", "Use session reference")] + [
+        (record.identifier, record.select_label)
+        for record in g_comparison_records
+        if record.has_telemetry
+    ]
+    live_saved_reference_select.options = live_reference_options
+    if (
+        g_live_saved_reference is not None
+        and g_live_saved_reference.identifier in g_comparison_records_by_id
+    ):
+        g_live_saved_reference = g_comparison_records_by_id[
+            g_live_saved_reference.identifier
+        ]
+        live_saved_reference_select.value = g_live_saved_reference.identifier
+    else:
+        g_live_saved_reference = None
+        live_saved_reference_select.value = ""
     g_comparison_widgets_updating = False
 
 
@@ -802,6 +921,10 @@ def load_comparison_files_handler():
 
     if g_display_mode == "comparison":
         restore_live_display()
+    else:
+        g_telemetry_update_needed = True
+        update_lap_change()
+        update_live_telemetry()
 
     if not g_comparison_records:
         detail = " ".join(result.errors) if result.errors else "No laps were found."
@@ -836,6 +959,9 @@ def clear_comparison_files_handler():
         restore_live_display()
     else:
         g_display_mode = "live"
+        g_telemetry_update_needed = True
+        update_lap_change()
+        update_live_telemetry()
     set_comparison_status("Saved-file comparison cleared. Live session display restored.")
 
 
@@ -932,6 +1058,7 @@ g_live_lap_generation = None
 g_live_lap_revision = -1
 g_live_sample_count = 0
 g_live_time_diff_updated_at = 0.0
+g_live_saved_reference: Optional[gt7comparison.ComparisonLap] = None
 g_comparison_records: List[gt7comparison.ComparisonLap] = []
 g_comparison_records_by_id: dict[str, gt7comparison.ComparisonLap] = {}
 g_comparison_overlay_ids: List[str] = []
@@ -1014,6 +1141,16 @@ comparison_load_button.on_click(load_comparison_files_handler)
 comparison_clear_button = Button(label="Clear Comparison")
 comparison_clear_button.on_click(clear_comparison_files_handler)
 
+live_saved_reference_select = Select(
+    title="Live saved reference",
+    value="",
+    options=[("", "Use session reference")],
+    sizing_mode="stretch_width",
+)
+live_saved_reference_select.on_change("value", live_saved_reference_handler)
+live_saved_reference_clear_button = Button(label="Clear Live Reference")
+live_saved_reference_clear_button.on_click(clear_live_saved_reference_handler)
+
 comparison_reference_select = Select(
     title="Reference lap",
     value="",
@@ -1091,6 +1228,20 @@ comparison_panel = column(
         sizing_mode="stretch_width",
         spacing=6,
         stylesheets=[RESPONSIVE_WRAP_STYLESHEET],
+    ),
+    row(
+        live_saved_reference_select,
+        live_saved_reference_clear_button,
+        sizing_mode="stretch_width",
+        spacing=6,
+        stylesheets=[RESPONSIVE_WRAP_STYLESHEET],
+    ),
+    Div(
+        text=(
+            "Choose one loaded lap to keep as the purple reference while "
+            "live telemetry continues to update."
+        ),
+        sizing_mode="stretch_width",
     ),
     row(
         comparison_reference_select,

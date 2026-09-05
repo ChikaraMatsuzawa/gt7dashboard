@@ -172,7 +172,9 @@ The comparison lap is blue and solid; the reference lap is magenta and dashed. O
 
 #### Live Telemetry
 
-While driving, the dashboard streams the current lap as an orange dot-dash trace approximately four times per second. The completed last lap remains blue, so current inputs and speed can be inspected without losing the historical comparison. The linked race line follows the live trace during driving; the live time-difference trace is refreshed once per second against the selected reference lap. Saved-file comparison intentionally pauses live rendering until it is cleared.
+While driving, the dashboard streams the current lap as an orange dot-dash trace approximately four times per second. The completed last lap remains blue, so current inputs and speed can be inspected without losing the historical comparison. The linked race line follows the live trace during driving; the live time-difference trace is refreshed once per second against the selected reference lap.
+
+After loading files in **Compare Saved Files**, choose **Live saved reference** to use one saved lap as the magenta reference without pausing packet-driven rendering. The current live lap continues in orange and its delta is calculated only through the distance shared with that saved reference. Clear the live reference to resume using the session reference. Selecting a static saved-file comparison still pauses live rendering until it is cleared.
 
 #### Time / Diff
 
