@@ -765,31 +765,83 @@ def update_saved_lap_comparison():
 def comparison_role_handler(attr, old, new):
     if g_comparison_widgets_updating:
         return
+    _sync_comparison_overlay_selection()
     update_saved_lap_comparison()
 
 
-def comparison_table_selection_handler(attr, old, new):
+def _update_overlay_selection_status(
+    role_conflicts: Optional[List[gt7comparison.ComparisonLap]] = None,
+    overflow_records: Optional[List[gt7comparison.ComparisonLap]] = None,
+):
+    """Show the checkbox selection and its line-style mapping explicitly."""
+    selected_records = [
+        _comparison_record(record_id)
+        for record_id in g_comparison_overlay_ids
+    ]
+    selected_records = [record for record in selected_records if record is not None]
+
+    overlays = []
+    for index, (color, _) in enumerate(COMPARISON_OVERLAY_STYLES):
+        label = "none"
+        if index < len(selected_records):
+            label = html.escape(selected_records[index].select_label)
+        overlays.append(
+            f"<span style='color:{color};'>● Overlay {index + 1} "
+            f"({COMPARISON_OVERLAY_STYLE_LABELS[index]}):</span> {label}"
+        )
+
+    notices = []
+    if role_conflicts:
+        labels = ", ".join(
+            html.escape(record.select_label) for record in role_conflicts
+        )
+        notices.append(
+            "Reference or comparison laps cannot be overlays and were unchecked: "
+            f"{labels}."
+        )
+    if overflow_records:
+        labels = ", ".join(
+            html.escape(record.select_label) for record in overflow_records
+        )
+        notices.append(
+            f"Only {MAX_COMPARISON_OVERLAYS} overlays are supported; unchecked: "
+            f"{labels}."
+        )
+
+    text = "<b>Checked overlays:</b> " + " &nbsp;·&nbsp; ".join(overlays)
+    if notices:
+        text += "<br><span style='color:#92400e;'>" + " ".join(notices) + "</span>"
+    overlay_selection_status.text = text
+
+
+def _sync_comparison_overlay_selection():
+    """Keep checkbox selection valid and return its explicit UI state."""
     global g_comparison_overlay_ids
     global g_comparison_widgets_updating
 
-    if g_comparison_widgets_updating:
-        return
-
     selected_ids = []
     retained_indices = []
+    role_conflicts = []
+    overflow_records = []
     for index in comparison_lap_source.selected.indices:
         identifiers = comparison_lap_source.data.get("identifier", [])
         if index >= len(identifiers):
             continue
         record_id = identifiers[index]
+        record = _comparison_record(record_id)
+        if record is None:
+            continue
         if record_id in {
             comparison_reference_select.value,
             comparison_lap_select.value,
         }:
+            role_conflicts.append(record)
             continue
         if len(selected_ids) < MAX_COMPARISON_OVERLAYS:
             selected_ids.append(record_id)
             retained_indices.append(index)
+        else:
+            overflow_records.append(record)
 
     if comparison_lap_source.selected.indices != retained_indices:
         g_comparison_widgets_updating = True
@@ -797,6 +849,27 @@ def comparison_table_selection_handler(attr, old, new):
         g_comparison_widgets_updating = False
 
     g_comparison_overlay_ids = selected_ids
+    _update_overlay_selection_status(role_conflicts, overflow_records)
+
+
+def comparison_table_selection_handler(attr, old, new):
+    if g_comparison_widgets_updating:
+        return
+
+    _sync_comparison_overlay_selection()
+    update_saved_lap_comparison()
+
+
+def clear_comparison_overlays_handler():
+    """Clear optional checkbox overlays without changing the two lap roles."""
+    global g_comparison_overlay_ids
+    global g_comparison_widgets_updating
+
+    g_comparison_widgets_updating = True
+    comparison_lap_source.selected.indices = []
+    g_comparison_widgets_updating = False
+    g_comparison_overlay_ids = []
+    _update_overlay_selection_status()
     update_saved_lap_comparison()
 
 
@@ -864,6 +937,7 @@ def clear_live_saved_reference_handler():
 def _reset_comparison_role_widgets():
     global g_comparison_widgets_updating
     global g_live_saved_reference
+    global g_comparison_overlay_ids
 
     g_comparison_widgets_updating = True
     options = [("", "Choose a lap")] + [
@@ -875,6 +949,7 @@ def _reset_comparison_role_widgets():
     comparison_reference_select.value = ""
     comparison_lap_select.value = ""
     comparison_lap_source.selected.indices = []
+    g_comparison_overlay_ids = []
 
     live_reference_options = [("", "Use session reference")] + [
         (record.identifier, record.select_label)
@@ -894,6 +969,7 @@ def _reset_comparison_role_widgets():
         g_live_saved_reference = None
         live_saved_reference_select.value = ""
     g_comparison_widgets_updating = False
+    _update_overlay_selection_status()
 
 
 def load_comparison_files_handler():
@@ -1069,6 +1145,7 @@ COMPARISON_OVERLAY_STYLES = [
     ("#ea580c", "dotdash"),
     ("#475569", "dotted"),
 ]
+COMPARISON_OVERLAY_STYLE_LABELS = ["orange dot-dash", "dark-gray dotted"]
 
 stored_lap_files = gt7helper.bokeh_tuple_for_list_of_lapfiles(
     list_lap_files_from_path(os.path.join(os.getcwd(), "data"))
@@ -1180,6 +1257,7 @@ comparison_lap_table = DataTable(
         TableColumn(field="distance", title="Distance"),
         TableColumn(field="status", title="Status"),
     ],
+    selectable="checkbox",
     index_position=None,
     height=230,
     sizing_mode="stretch_width",
@@ -1197,10 +1275,21 @@ comparison_key = Div(
     ),
     sizing_mode="stretch_width",
 )
+overlay_selection_status = Div(
+    text=(
+        "<b>Checked overlays:</b> "
+        "<span style='color:#ea580c;'>● Overlay 1 (orange dot-dash):</span> none "
+        "&nbsp;·&nbsp; "
+        "<span style='color:#475569;'>● Overlay 2 (dark-gray dotted):</span> none"
+    ),
+    sizing_mode="stretch_width",
+)
 comparison_status = Div(
     text="Choose saved files, then assign a reference and comparison lap.",
     sizing_mode="stretch_width",
 )
+comparison_clear_overlays_button = Button(label="Clear Overlays")
+comparison_clear_overlays_button.on_click(clear_comparison_overlays_handler)
 
 RESPONSIVE_WRAP_STYLESHEET = """
 @media (max-width: 1100px) {
@@ -1252,10 +1341,17 @@ comparison_panel = column(
     ),
     comparison_key,
     comparison_status,
+    row(
+        overlay_selection_status,
+        comparison_clear_overlays_button,
+        sizing_mode="stretch_width",
+        spacing=6,
+        stylesheets=[RESPONSIVE_WRAP_STYLESHEET],
+    ),
     Div(
         text=(
-            "Select up to two additional rows below to overlay them on the "
-            "telemetry graphs."
+            "Check up to two additional rows below to overlay them. Uncheck a "
+            "row or use Clear Overlays to remove it."
         ),
         sizing_mode="stretch_width",
     ),

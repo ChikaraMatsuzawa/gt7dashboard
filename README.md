@@ -166,7 +166,7 @@ You can reset all laps with the 'Reset Laps' button. This is helpful if you are 
 
 #### Saved-file Comparison
 
-Use **Compare Saved Files** to open the saved-file comparison panel. Select one or more JSON files, load them into the source-aware lap table, then choose an explicit reference lap and comparison lap. Select up to two more table rows to overlay their telemetry traces.
+Use **Compare Saved Files** to open the saved-file comparison panel. Select one or more JSON files, load them into the source-aware lap table, then choose an explicit reference lap and comparison lap. Check up to two additional table rows to overlay their telemetry traces. The checked-overlays status names the lap assigned to each line style; uncheck a row or use **Clear Overlays** to remove it.
 
 The comparison lap is blue and solid; the reference lap is magenta and dashed. Overlays use orange dot-dash and dark-gray dotted lines. The time-difference chart shows comparison minus reference, and the analysis window is limited to the distance shared by both selected laps. Laps with substantially different total distances are not compared; a start/finish-position mismatch is shown as a warning because saved telemetry does not contain an explicit circuit id.
 

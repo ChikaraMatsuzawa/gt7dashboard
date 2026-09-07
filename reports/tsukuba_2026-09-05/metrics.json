@@ -1,0 +1,1193 @@
+{
+  "reference_length": 2075.288607645056,
+  "own": [
+    {
+      "label": "own",
+      "index": 0,
+      "lap_number": 10,
+      "finish": 71.371,
+      "start_timestamp": "2026-09-05 01:45:34.620996",
+      "samples": 4264,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.13299999999999912,
+      "path_length": 2099.9882055507965,
+      "projection_error_m_p95": 5.114725734839797,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 45.04599999999998,
+      "braking_seconds": 9.283000000000003,
+      "coasting_seconds": 2.5010000000000074,
+      "start_speed": 136.24297943115235,
+      "max_speed": 145.39069061279298
+    },
+    {
+      "label": "own",
+      "index": 1,
+      "lap_number": 9,
+      "finish": 72.408,
+      "start_timestamp": "2026-09-05 01:44:22.160061",
+      "samples": 4327,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.034000000000006025,
+      "path_length": 2099.722869240306,
+      "projection_error_m_p95": 5.939252209617627,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 44.99000000000001,
+      "braking_seconds": 8.017999999999997,
+      "coasting_seconds": 3.982,
+      "start_speed": 134.05646667480468,
+      "max_speed": 143.9036636352539
+    },
+    {
+      "label": "own",
+      "index": 2,
+      "lap_number": 8,
+      "finish": 70.881,
+      "start_timestamp": "2026-09-05 01:43:11.194308",
+      "samples": 4232,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.03400000000000247,
+      "path_length": 2075.0368527829096,
+      "projection_error_m_p95": 3.204894624916203,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 44.098000000000006,
+      "braking_seconds": 9.133000000000003,
+      "coasting_seconds": 1.314999999999999,
+      "start_speed": 134.58629608154297,
+      "max_speed": 143.98670654296876
+    },
+    {
+      "label": "own",
+      "index": 3,
+      "lap_number": 7,
+      "finish": 73.201,
+      "start_timestamp": "2026-09-05 01:41:58.031753",
+      "samples": 4364,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.13399999999999856,
+      "path_length": 2095.7927806752828,
+      "projection_error_m_p95": 3.3715959061276517,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 43.13699999999999,
+      "braking_seconds": 7.914999999999997,
+      "coasting_seconds": 3.5830000000000113,
+      "start_speed": 128.89381256103516,
+      "max_speed": 144.68518981933593
+    },
+    {
+      "label": "own",
+      "index": 4,
+      "lap_number": 6,
+      "finish": 71.106,
+      "start_timestamp": "2026-09-05 01:40:46.738433",
+      "samples": 4245,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.10000000000000853,
+      "path_length": 2087.909259250288,
+      "projection_error_m_p95": 2.981701674204634,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 46.18500000000001,
+      "braking_seconds": 8.816000000000003,
+      "coasting_seconds": 2.3839999999999884,
+      "start_speed": 132.52166290283205,
+      "max_speed": 143.5121795654297
+    },
+    {
+      "label": "own",
+      "index": 5,
+      "lap_number": 5,
+      "finish": 70.673,
+      "start_timestamp": "2026-09-05 01:39:36.036763",
+      "samples": 4211,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.20000000000000284,
+      "path_length": 2082.3278314465715,
+      "projection_error_m_p95": 3.6720396091380634,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 45.81299999999999,
+      "braking_seconds": 9.583000000000004,
+      "coasting_seconds": 3.0500000000000074,
+      "start_speed": 133.74827270507814,
+      "max_speed": 143.3554870605469
+    },
+    {
+      "label": "own",
+      "index": 6,
+      "lap_number": 4,
+      "finish": 71.717,
+      "start_timestamp": "2026-09-05 01:38:24.220913",
+      "samples": 4284,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.05000000000000071,
+      "path_length": 2089.7723810241073,
+      "projection_error_m_p95": 4.824442887639018,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 45.206999999999994,
+      "braking_seconds": 8.132999999999994,
+      "coasting_seconds": 3.615999999999998,
+      "start_speed": 135.27339477539064,
+      "max_speed": 144.47780914306642
+    },
+    {
+      "label": "own",
+      "index": 7,
+      "lap_number": 3,
+      "finish": 70.989,
+      "start_timestamp": "2026-09-05 01:37:13.235020",
+      "samples": 4218,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.25,
+      "path_length": 2088.3757490281914,
+      "projection_error_m_p95": 3.7332094389197383,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 43.255999999999986,
+      "braking_seconds": 9.15,
+      "coasting_seconds": 2.383999999999999,
+      "start_speed": 134.66123657226564,
+      "max_speed": 143.89738769531252
+    },
+    {
+      "label": "own",
+      "index": 8,
+      "lap_number": 2,
+      "finish": 73.201,
+      "start_timestamp": "2026-09-05 01:35:59.911412",
+      "samples": 4357,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.14999999999999858,
+      "path_length": 2076.5174065168076,
+      "projection_error_m_p95": 3.873706291884018,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 44.01400000000002,
+      "braking_seconds": 9.116999999999999,
+      "coasting_seconds": 2.5840000000000063,
+      "start_speed": 133.79365997314454,
+      "max_speed": 143.7268524169922
+    },
+    {
+      "label": "own",
+      "index": 9,
+      "lap_number": 1,
+      "finish": 72.049,
+      "start_timestamp": "2026-09-05 01:34:47.774980",
+      "samples": 4303,
+      "stale_samples_dropped": 0,
+      "max_clock_gap": 0.13400000000000034,
+      "path_length": 2097.3296992208784,
+      "projection_error_m_p95": 6.329882740817175,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 47.25,
+      "braking_seconds": 8.632999999999997,
+      "coasting_seconds": 0.9830000000000059,
+      "start_speed": 132.02438049316407,
+      "max_speed": 143.85471954345704
+    },
+    {
+      "label": "own",
+      "index": 10,
+      "lap_number": 8,
+      "finish": 71.844,
+      "start_timestamp": "2026-09-05 01:32:45.822022",
+      "samples": 4293,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.13299999999999912,
+      "path_length": 2100.5418712498417,
+      "projection_error_m_p95": 5.769417170455671,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 46.53999999999999,
+      "braking_seconds": 8.767000000000005,
+      "coasting_seconds": 4.066999999999991,
+      "start_speed": 134.75352172851564,
+      "max_speed": 144.44088134765624
+    },
+    {
+      "label": "own",
+      "index": 11,
+      "lap_number": 7,
+      "finish": 71.822,
+      "start_timestamp": "2026-09-05 01:31:33.904712",
+      "samples": 4284,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.11699999999999999,
+      "path_length": 2078.134486309865,
+      "projection_error_m_p95": 2.4769292107483585,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 40.547,
+      "braking_seconds": 8.582999999999998,
+      "coasting_seconds": 1.9680000000000053,
+      "start_speed": 132.42730407714845,
+      "max_speed": 143.56183776855468
+    },
+    {
+      "label": "own",
+      "index": 12,
+      "lap_number": 6,
+      "finish": 70.597,
+      "start_timestamp": "2026-09-05 01:30:23.264337",
+      "samples": 4223,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.034000000000006025,
+      "path_length": 2083.2175426460544,
+      "projection_error_m_p95": 2.569231061422219,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 47.26999999999999,
+      "braking_seconds": 9.067,
+      "coasting_seconds": 1.5999999999999934,
+      "start_speed": 133.9859344482422,
+      "max_speed": 144.34466857910158
+    },
+    {
+      "label": "own",
+      "index": 13,
+      "lap_number": 5,
+      "finish": 71.572,
+      "start_timestamp": "2026-09-05 01:29:11.601243",
+      "samples": 4268,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.23300000000000054,
+      "path_length": 2086.84953782149,
+      "projection_error_m_p95": 2.8788309024936254,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 40.00500000000001,
+      "braking_seconds": 9.200999999999995,
+      "coasting_seconds": 2.1159999999999988,
+      "start_speed": 135.7993927001953,
+      "max_speed": 144.5119354248047
+    },
+    {
+      "label": "own",
+      "index": 14,
+      "lap_number": 4,
+      "finish": 72.933,
+      "start_timestamp": "2026-09-05 01:27:58.591975",
+      "samples": 4360,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.13299999999999557,
+      "path_length": 2072.429306800402,
+      "projection_error_m_p95": 3.7522001590114504,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 45.36900000000001,
+      "braking_seconds": 8.700999999999997,
+      "coasting_seconds": 3.4020000000000072,
+      "start_speed": 135.39354400634767,
+      "max_speed": 144.4641860961914
+    },
+    {
+      "label": "own",
+      "index": 15,
+      "lap_number": 3,
+      "finish": 71.184,
+      "start_timestamp": "2026-09-05 01:26:47.356711",
+      "samples": 4246,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.13300000000000267,
+      "path_length": 2090.1372037583124,
+      "projection_error_m_p95": 2.942422816594611,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 43.81900000000001,
+      "braking_seconds": 8.665999999999999,
+      "coasting_seconds": 3.316999999999998,
+      "start_speed": 135.54358978271486,
+      "max_speed": 144.81423797607422
+    },
+    {
+      "label": "own",
+      "index": 16,
+      "lap_number": 2,
+      "finish": 71.078,
+      "start_timestamp": "2026-09-05 01:25:36.187499",
+      "samples": 4227,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.1330000000000009,
+      "path_length": 2082.6741441321665,
+      "projection_error_m_p95": 2.029259136347784,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 38.03300000000002,
+      "braking_seconds": 8.166000000000004,
+      "coasting_seconds": 4.151000000000005,
+      "start_speed": 135.2242858886719,
+      "max_speed": 144.11484832763674
+    },
+    {
+      "label": "own",
+      "index": 17,
+      "lap_number": 1,
+      "finish": 71.158,
+      "start_timestamp": "2026-09-05 01:24:24.968529",
+      "samples": 4244,
+      "stale_samples_dropped": 0,
+      "max_clock_gap": 0.13299999999999912,
+      "path_length": 2096.165893857313,
+      "projection_error_m_p95": 5.313363427359928,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 46.955999999999996,
+      "braking_seconds": 7.667000000000001,
+      "coasting_seconds": 4.150999999999986,
+      "start_speed": 130.89712829589845,
+      "max_speed": 143.6313262939453
+    }
+  ],
+  "refs": [
+    {
+      "label": "1_08_943_TC2000_Roadster_NR-A_ND_22.json",
+      "index": 0,
+      "lap_number": 3,
+      "finish": 68.943,
+      "start_timestamp": "2026-09-04 00:03:05.533312",
+      "samples": 4135,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.017000000000010118,
+      "path_length": 2073.6461174640867,
+      "projection_error_m_p95": 0.0,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 52.16199999999999,
+      "braking_seconds": 7.900000000000006,
+      "coasting_seconds": 4.0360000000000005,
+      "start_speed": 138.21589050292968,
+      "max_speed": 146.8733093261719
+    },
+    {
+      "label": "1_08_975_TC2000_Roadster_NR-A_ND_22.json",
+      "index": 0,
+      "lap_number": 1,
+      "finish": 68.975,
+      "start_timestamp": "2026-09-03 23:50:22.485173",
+      "samples": 4138,
+      "stale_samples_dropped": 0,
+      "max_clock_gap": 0.017000000000010118,
+      "path_length": 2075.7396242879076,
+      "projection_error_m_p95": 0.48193784731443984,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 51.82599999999998,
+      "braking_seconds": 7.232999999999999,
+      "coasting_seconds": 4.354000000000028,
+      "start_speed": 137.22390747070312,
+      "max_speed": 146.00228576660157
+    },
+    {
+      "label": "1_09_055_TC2000_Roadster_NR-A_ND_22.json",
+      "index": 0,
+      "lap_number": 3,
+      "finish": 69.055,
+      "start_timestamp": "2026-09-04 00:05:57.003429",
+      "samples": 4142,
+      "stale_samples_dropped": 1,
+      "max_clock_gap": 0.017000000000010118,
+      "path_length": 2075.3862675324444,
+      "projection_error_m_p95": 1.0076609132803471,
+      "projection_backsteps": 0,
+      "full_throttle_seconds": 51.55499999999999,
+      "braking_seconds": 7.615999999999996,
+      "coasting_seconds": 5.0669999999999975,
+      "start_speed": 138.01824645996095,
+      "max_speed": 146.58316040039062
+    }
+  ],
+  "best_index": 12,
+  "minima": [
+    {
+      "s": 252.0,
+      "v": 64.73882395695966
+    },
+    {
+      "s": 634.0,
+      "v": 59.99419531892348
+    },
+    {
+      "s": 1218.0,
+      "v": 59.85814742088415
+    },
+    {
+      "s": 1882.0,
+      "v": 118.02478361703969
+    }
+  ],
+  "sections": [
+    {
+      "name": "Start to T1 braking",
+      "start_m": 0,
+      "end_m": 150,
+      "ref_s": 3.766,
+      "own_best_s": 3.867,
+      "loss_s": 0.101,
+      "own_median_s": 3.854,
+      "own_best_piece_s": 3.812,
+      "best_piece_index": 0,
+      "own_std_s": 0.04
+    },
+    {
+      "name": "T1 and S bends",
+      "start_m": 150,
+      "end_m": 500,
+      "ref_s": 13.111,
+      "own_best_s": 13.678,
+      "loss_s": 0.567,
+      "own_median_s": 13.694,
+      "own_best_piece_s": 13.43,
+      "best_piece_index": 17,
+      "own_std_s": 0.397
+    },
+    {
+      "name": "First hairpin",
+      "start_m": 500,
+      "end_m": 800,
+      "ref_s": 12.005,
+      "own_best_s": 12.519,
+      "loss_s": 0.514,
+      "own_median_s": 12.501,
+      "own_best_piece_s": 12.247,
+      "best_piece_index": 7,
+      "own_std_s": 0.373
+    },
+    {
+      "name": "Dunlop and 80R",
+      "start_m": 800,
+      "end_m": 1120,
+      "ref_s": 9.736,
+      "own_best_s": 9.869,
+      "loss_s": 0.133,
+      "own_median_s": 10.063,
+      "own_best_piece_s": 9.869,
+      "best_piece_index": 12,
+      "own_std_s": 0.248
+    },
+    {
+      "name": "Second hairpin and back straight",
+      "start_m": 1120,
+      "end_m": 1750,
+      "ref_s": 21.083,
+      "own_best_s": 21.245,
+      "loss_s": 0.162,
+      "own_median_s": 21.645,
+      "own_best_piece_s": 21.245,
+      "best_piece_index": 12,
+      "own_std_s": 0.292
+    },
+    {
+      "name": "Final corner",
+      "start_m": 1750,
+      "end_m": 2075.288607645056,
+      "ref_s": 9.242,
+      "own_best_s": 9.419,
+      "loss_s": 0.177,
+      "own_median_s": 9.44,
+      "own_best_piece_s": 9.337,
+      "best_piece_index": 15,
+      "own_std_s": 0.109
+    }
+  ],
+  "theoretical_best": 69.94025512521891,
+  "best_piece_indices": [
+    0,
+    17,
+    7,
+    12,
+    12,
+    15
+  ],
+  "controls": [
+    {
+      "label": "own",
+      "finish": 70.597,
+      "corners": [
+        {
+          "name": "T1",
+          "minimum_speed": 64.06,
+          "minimum_s": 250.9,
+          "gear_at_min": 2,
+          "steering_at_min": -2.09,
+          "braking_runs": [
+            {
+              "s0": 151.7,
+              "s1": 237.6,
+              "duration": 3.1,
+              "v0": 142.9,
+              "v1": 69.26
+            }
+          ],
+          "full_throttle_runs": [
+            {
+              "s0": 140.4,
+              "s1": 148.3,
+              "duration": 0.2,
+              "v0": 142.61,
+              "v1": 142.96
+            },
+            {
+              "s0": 218.4,
+              "s1": 220.7,
+              "duration": 0.1,
+              "v0": 84.6,
+              "v1": 83.17
+            },
+            {
+              "s0": 247.2,
+              "s1": 275.3,
+              "duration": 1.5,
+              "v0": 64.36,
+              "v1": 65.45
+            },
+            {
+              "s0": 290.8,
+              "s1": 294.6,
+              "duration": 0.2,
+              "v0": 65.82,
+              "v1": 67.2
+            },
+            {
+              "s0": 295.3,
+              "s1": 361.6,
+              "duration": 2.817,
+              "v0": 67.67,
+              "v1": 95.75
+            },
+            {
+              "s0": 376.7,
+              "s1": 400.1,
+              "duration": 0.85,
+              "v0": 96.06,
+              "v1": 101.56
+            }
+          ],
+          "partial_throttle_seconds": 1.767
+        },
+        {
+          "name": "HP1",
+          "minimum_speed": 53.59,
+          "minimum_s": 636.4,
+          "gear_at_min": 2,
+          "steering_at_min": 7.2,
+          "braking_runs": [
+            {
+              "s0": 558.7,
+              "s1": 630.1,
+              "duration": 3.084,
+              "v0": 126.36,
+              "v1": 56.61
+            }
+          ],
+          "full_throttle_runs": [
+            {
+              "s0": 500.5,
+              "s1": 557.0,
+              "duration": 1.666,
+              "v0": 119.74,
+              "v1": 126.25
+            },
+            {
+              "s0": 579.5,
+              "s1": 589.8,
+              "duration": 0.366,
+              "v0": 107.91,
+              "v1": 98.61
+            },
+            {
+              "s0": 637.5,
+              "s1": 741.7,
+              "duration": 5.017,
+              "v0": 53.7,
+              "v1": 96.49
+            },
+            {
+              "s0": 756.9,
+              "s1": 779.8,
+              "duration": 0.833,
+              "v0": 96.57,
+              "v1": 101.17
+            }
+          ],
+          "partial_throttle_seconds": 1.466
+        },
+        {
+          "name": "Dunlop",
+          "minimum_speed": 99.25,
+          "minimum_s": 801.7,
+          "gear_at_min": 3,
+          "steering_at_min": -2.85,
+          "braking_runs": [],
+          "full_throttle_runs": [
+            {
+              "s0": 805.4,
+              "s1": 1120.3,
+              "duration": 9.683,
+              "v0": 99.35,
+              "v1": 135.28
+            }
+          ],
+          "partial_throttle_seconds": 0.184
+        },
+        {
+          "name": "HP2",
+          "minimum_speed": 56.08,
+          "minimum_s": 1214.3,
+          "gear_at_min": 2,
+          "steering_at_min": -9.11,
+          "braking_runs": [
+            {
+              "s0": 1137.3,
+              "s1": 1209.3,
+              "duration": 2.883,
+              "v0": 136.67,
+              "v1": 57.84
+            }
+          ],
+          "full_throttle_runs": [
+            {
+              "s0": 1120.3,
+              "s1": 1134.8,
+              "duration": 0.383,
+              "v0": 135.34,
+              "v1": 136.55
+            },
+            {
+              "s0": 1166.0,
+              "s1": 1176.8,
+              "duration": 0.384,
+              "v0": 108.74,
+              "v1": 96.66
+            },
+            {
+              "s0": 1217.4,
+              "s1": 1323.3,
+              "duration": 4.983,
+              "v0": 56.65,
+              "v1": 96.31
+            },
+            {
+              "s0": 1337.1,
+              "s1": 1450.5,
+              "duration": 3.8,
+              "v0": 96.45,
+              "v1": 117.36
+            }
+          ],
+          "partial_throttle_seconds": 0.867
+        },
+        {
+          "name": "Final",
+          "minimum_speed": 117.22,
+          "minimum_s": 1942.8,
+          "gear_at_min": 3,
+          "steering_at_min": -4.59,
+          "braking_runs": [],
+          "full_throttle_runs": [
+            {
+              "s0": 1945.0,
+              "s1": 2074.8,
+              "duration": 3.772,
+              "v0": 117.26,
+              "v1": 132.27
+            }
+          ],
+          "partial_throttle_seconds": 4.716
+        }
+      ]
+    },
+    {
+      "label": "1_08_943_TC2000_Roadster_NR-A_ND_22.json",
+      "finish": 68.943,
+      "corners": [
+        {
+          "name": "T1",
+          "minimum_speed": 64.73,
+          "minimum_s": 251.2,
+          "gear_at_min": 2,
+          "steering_at_min": -2.68,
+          "braking_runs": [
+            {
+              "s0": 155.3,
+              "s1": 239.8,
+              "duration": 2.983,
+              "v0": 142.36,
+              "v1": 68.61
+            }
+          ],
+          "full_throttle_runs": [
+            {
+              "s0": 140.4,
+              "s1": 145.2,
+              "duration": 0.117,
+              "v0": 146.64,
+              "v1": 146.82
+            },
+            {
+              "s0": 251.5,
+              "s1": 346.4,
+              "duration": 4.317,
+              "v0": 64.74,
+              "v1": 96.23
+            },
+            {
+              "s0": 358.8,
+              "s1": 400.3,
+              "duration": 1.466,
+              "v0": 96.79,
+              "v1": 106.13
+            }
+          ],
+          "partial_throttle_seconds": 0.717
+        },
+        {
+          "name": "HP1",
+          "minimum_speed": 59.97,
+          "minimum_s": 633.8,
+          "gear_at_min": 2,
+          "steering_at_min": 6.82,
+          "braking_runs": [
+            {
+              "s0": 561.3,
+              "s1": 620.8,
+              "duration": 2.367,
+              "v0": 125.12,
+              "v1": 65.45
+            }
+          ],
+          "full_throttle_runs": [
+            {
+              "s0": 500.1,
+              "s1": 554.2,
+              "duration": 1.533,
+              "v0": 123.37,
+              "v1": 129.27
+            },
+            {
+              "s0": 633.8,
+              "s1": 734.4,
+              "duration": 4.783,
+              "v0": 59.97,
+              "v1": 95.14
+            },
+            {
+              "s0": 746.3,
+              "s1": 800.5,
+              "duration": 1.934,
+              "v0": 95.39,
+              "v1": 104.49
+            }
+          ],
+          "partial_throttle_seconds": 0.551
+        },
+        {
+          "name": "Dunlop",
+          "minimum_speed": 104.13,
+          "minimum_s": 806.7,
+          "gear_at_min": 3,
+          "steering_at_min": -6.62,
+          "braking_runs": [],
+          "full_throttle_runs": [
+            {
+              "s0": 809.2,
+              "s1": 1120.5,
+              "duration": 9.433,
+              "v0": 104.28,
+              "v1": 136.41
+            }
+          ],
+          "partial_throttle_seconds": 0.284
+        },
+        {
+          "name": "HP2",
+          "minimum_speed": 59.81,
+          "minimum_s": 1217.3,
+          "gear_at_min": 2,
+          "steering_at_min": -8.75,
+          "braking_runs": [
+            {
+              "s0": 1143.3,
+              "s1": 1205.7,
+              "duration": 2.433,
+              "v0": 132.78,
+              "v1": 63.95
+            }
+          ],
+          "full_throttle_runs": [
+            {
+              "s0": 1120.5,
+              "s1": 1134.5,
+              "duration": 0.367,
+              "v0": 136.47,
+              "v1": 137.58
+            },
+            {
+              "s0": 1218.4,
+              "s1": 1322.3,
+              "duration": 4.9,
+              "v0": 59.93,
+              "v1": 95.49
+            },
+            {
+              "s0": 1334.2,
+              "s1": 1450.1,
+              "duration": 3.9,
+              "v0": 95.68,
+              "v1": 117.18
+            }
+          ],
+          "partial_throttle_seconds": 0.766
+        },
+        {
+          "name": "Final",
+          "minimum_speed": 118.01,
+          "minimum_s": 1882.1,
+          "gear_at_min": 3,
+          "steering_at_min": -5.3,
+          "braking_runs": [],
+          "full_throttle_runs": [
+            {
+              "s0": 1862.9,
+              "s1": 2074.8,
+              "duration": 6.095,
+              "v0": 118.52,
+              "v1": 135.69
+            }
+          ],
+          "partial_throttle_seconds": 0.5
+        }
+      ]
+    },
+    {
+      "label": "1_08_975_TC2000_Roadster_NR-A_ND_22.json",
+      "finish": 68.975,
+      "corners": [
+        {
+          "name": "T1",
+          "minimum_speed": 66.11,
+          "minimum_s": 253.7,
+          "gear_at_min": 2,
+          "steering_at_min": -4.16,
+          "braking_runs": [
+            {
+              "s0": 162.2,
+              "s1": 234.9,
+              "duration": 2.566,
+              "v0": 140.16,
+              "v1": 72.63
+            }
+          ],
+          "full_throttle_runs": [
+            {
+              "s0": 140.1,
+              "s1": 149.5,
+              "duration": 0.233,
+              "v0": 145.62,
+              "v1": 145.96
+            },
+            {
+              "s0": 252.8,
+              "s1": 255.3,
+              "duration": 0.133,
+              "v0": 66.15,
+              "v1": 66.23
+            },
+            {
+              "s0": 256.8,
+              "s1": 348.2,
+              "duration": 4.1,
+              "v0": 66.57,
+              "v1": 96.47
+            },
+            {
+              "s0": 358.9,
+              "s1": 400.4,
+              "duration": 1.466,
+              "v0": 96.93,
+              "v1": 106.27
+            }
+          ],
+          "partial_throttle_seconds": 0.717
+        },
+        {
+          "name": "HP1",
+          "minimum_speed": 59.41,
+          "minimum_s": 632.8,
+          "gear_at_min": 2,
+          "steering_at_min": 5.21,
+          "braking_runs": [
+            {
+              "s0": 564.7,
+              "s1": 619.7,
+              "duration": 2.2,
+              "v0": 123.63,
+              "v1": 65.25
+            }
+          ],
+          "full_throttle_runs": [
+            {
+              "s0": 500.3,
+              "s1": 554.7,
+              "duration": 1.55,
+              "v0": 123.38,
+              "v1": 129.36
+            },
+            {
+              "s0": 632.2,
+              "s1": 735.9,
+              "duration": 4.933,
+              "v0": 59.51,
+              "v1": 95.42
+            },
+            {
+              "s0": 747.8,
+              "s1": 795.4,
+              "duration": 1.7,
+              "v0": 95.91,
+              "v1": 103.9
+            }
+          ],
+          "partial_throttle_seconds": 0.783
+        },
+        {
+          "name": "Dunlop",
+          "minimum_speed": 103.22,
+          "minimum_s": 802.1,
+          "gear_at_min": 3,
+          "steering_at_min": -6.42,
+          "braking_runs": [],
+          "full_throttle_runs": [
+            {
+              "s0": 803.1,
+              "s1": 808.8,
+              "duration": 0.2,
+              "v0": 103.26,
+              "v1": 103.82
+            },
+            {
+              "s0": 812.7,
+              "s1": 1120.3,
+              "duration": 9.317,
+              "v0": 104.04,
+              "v1": 136.37
+            }
+          ],
+          "partial_throttle_seconds": 0.233
+        },
+        {
+          "name": "HP2",
+          "minimum_speed": 59.58,
+          "minimum_s": 1219.3,
+          "gear_at_min": 2,
+          "steering_at_min": -5.49,
+          "braking_runs": [
+            {
+              "s0": 1144.3,
+              "s1": 1207.2,
+              "duration": 2.467,
+              "v0": 132.06,
+              "v1": 64.92
+            }
+          ],
+          "full_throttle_runs": [
+            {
+              "s0": 1120.3,
+              "s1": 1134.2,
+              "duration": 0.366,
+              "v0": 136.43,
+              "v1": 137.5
+            },
+            {
+              "s0": 1219.1,
+              "s1": 1326.0,
+              "duration": 5.05,
+              "v0": 59.63,
+              "v1": 96.59
+            },
+            {
+              "s0": 1338.0,
+              "s1": 1450.1,
+              "duration": 3.75,
+              "v0": 96.81,
+              "v1": 117.39
+            }
+          ],
+          "partial_throttle_seconds": 0.534
+        },
+        {
+          "name": "Final",
+          "minimum_speed": 117.37,
+          "minimum_s": 1878.0,
+          "gear_at_min": 3,
+          "steering_at_min": -4.64,
+          "braking_runs": [],
+          "full_throttle_runs": [
+            {
+              "s0": 1872.5,
+              "s1": 2074.8,
+              "duration": 5.809,
+              "v0": 117.55,
+              "v1": 135.74
+            }
+          ],
+          "partial_throttle_seconds": 1.183
+        }
+      ]
+    },
+    {
+      "label": "1_09_055_TC2000_Roadster_NR-A_ND_22.json",
+      "finish": 69.055,
+      "corners": [
+        {
+          "name": "T1",
+          "minimum_speed": 65.63,
+          "minimum_s": 251.3,
+          "gear_at_min": 2,
+          "steering_at_min": -3.94,
+          "braking_runs": [
+            {
+              "s0": 159.8,
+              "s1": 237.3,
+              "duration": 2.767,
+              "v0": 141.57,
+              "v1": 70.26
+            }
+          ],
+          "full_throttle_runs": [
+            {
+              "s0": 140.2,
+              "s1": 149.7,
+              "duration": 0.233,
+              "v0": 146.2,
+              "v1": 146.54
+            },
+            {
+              "s0": 254.0,
+              "s1": 347.7,
+              "duration": 4.2,
+              "v0": 65.8,
+              "v1": 96.43
+            },
+            {
+              "s0": 360.7,
+              "s1": 400.2,
+              "duration": 1.4,
+              "v0": 96.93,
+              "v1": 105.83
+            }
+          ],
+          "partial_throttle_seconds": 0.851
+        },
+        {
+          "name": "HP1",
+          "minimum_speed": 57.33,
+          "minimum_s": 635.9,
+          "gear_at_min": 2,
+          "steering_at_min": 7.38,
+          "braking_runs": [
+            {
+              "s0": 564.8,
+              "s1": 624.5,
+              "duration": 2.416,
+              "v0": 123.86,
+              "v1": 61.73
+            }
+          ],
+          "full_throttle_runs": [
+            {
+              "s0": 500.3,
+              "s1": 556.0,
+              "duration": 1.584,
+              "v0": 123.17,
+              "v1": 129.19
+            },
+            {
+              "s0": 636.1,
+              "s1": 738.7,
+              "duration": 4.833,
+              "v0": 57.43,
+              "v1": 95.8
+            },
+            {
+              "s0": 750.7,
+              "s1": 797.3,
+              "duration": 1.667,
+              "v0": 96.03,
+              "v1": 103.52
+            }
+          ],
+          "partial_throttle_seconds": 0.75
+        },
+        {
+          "name": "Dunlop",
+          "minimum_speed": 103.4,
+          "minimum_s": 806.4,
+          "gear_at_min": 3,
+          "steering_at_min": -5.48,
+          "braking_runs": [],
+          "full_throttle_runs": [
+            {
+              "s0": 826.5,
+              "s1": 1120.6,
+              "duration": 8.866,
+              "v0": 104.35,
+              "v1": 136.59
+            }
+          ],
+          "partial_throttle_seconds": 0.9
+        },
+        {
+          "name": "HP2",
+          "minimum_speed": 59.27,
+          "minimum_s": 1215.5,
+          "gear_at_min": 2,
+          "steering_at_min": -8.55,
+          "braking_runs": [
+            {
+              "s0": 1142.7,
+              "s1": 1204.3,
+              "duration": 2.433,
+              "v0": 132.36,
+              "v1": 63.78
+            }
+          ],
+          "full_throttle_runs": [
+            {
+              "s0": 1120.6,
+              "s1": 1133.3,
+              "duration": 0.334,
+              "v0": 136.63,
+              "v1": 137.61
+            },
+            {
+              "s0": 1163.3,
+              "s1": 1173.7,
+              "duration": 0.367,
+              "v0": 108.91,
+              "v1": 97.49
+            },
+            {
+              "s0": 1216.0,
+              "s1": 1323.0,
+              "duration": 5.0,
+              "v0": 59.32,
+              "v1": 95.91
+            },
+            {
+              "s0": 1334.1,
+              "s1": 1450.0,
+              "duration": 3.884,
+              "v0": 96.23,
+              "v1": 117.61
+            }
+          ],
+          "partial_throttle_seconds": 0.499
+        },
+        {
+          "name": "Final",
+          "minimum_speed": 116.95,
+          "minimum_s": 1860.0,
+          "gear_at_min": 3,
+          "steering_at_min": -4.69,
+          "braking_runs": [],
+          "full_throttle_runs": [
+            {
+              "s0": 1867.6,
+              "s1": 2074.8,
+              "duration": 5.955,
+              "v0": 117.21,
+              "v1": 135.35
+            }
+          ],
+          "partial_throttle_seconds": 0.683
+        }
+      ]
+    }
+  ]
+}
