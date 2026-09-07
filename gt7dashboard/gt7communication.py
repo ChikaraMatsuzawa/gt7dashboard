@@ -481,7 +481,7 @@ class GT7Communication(Thread):
         delta_fl = data.type_speed_FL / delta_divisor
         delta_fr = data.type_speed_FR / delta_divisor
         delta_rl = data.type_speed_RL / delta_divisor
-        delta_rr = data.type_speed_FR / delta_divisor
+        delta_rr = data.tyre_speed_RR / delta_divisor
 
         if delta_fl > 1.1 or delta_fr > 1.1 or delta_rl > 1.1 or delta_rr > 1.1:
             self.current_lap.tires_spinning_ticks += 1

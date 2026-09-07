@@ -209,6 +209,23 @@ class PacketDecoderTest(unittest.TestCase):
         self.assertAlmostEqual(2.65, lap.wheel_base_m, places=6)
         self.assertEqual('GR3', lap.car_category)
 
+    def test_tire_ratio_uses_rear_right_wheel_speed(self):
+        packet_size, _ = gt7communication.PACKET_FORMATS['A']
+        plaintext = bytearray(packet_size)
+        struct.pack_into('<f', plaintext, 0x4C, 10.0)  # 36 km/h
+        for offset in (0xB4, 0xB8, 0xBC, 0xC0):
+            struct.pack_into('<f', plaintext, offset, 1.0)
+        struct.pack_into('<ffff', plaintext, 0xA4, 1.0, 1.0, 1.0, 3.0)
+
+        data = gt7communication.GTData(plaintext)
+        data.in_race = True
+        communication = gt7communication.GT7Communication('192.0.2.1')
+        communication._log_data(data)
+
+        self.assertAlmostEqual(3.6, data.type_speed_FR)
+        self.assertAlmostEqual(10.8, data.tyre_speed_RR)
+        self.assertAlmostEqual(0.6, communication.current_lap.data_tires[0])
+
     def test_always_record_data_captures_replay_packets(self):
         communication = gt7communication.GT7Communication('192.0.2.1')
         data = gt7communication.GTData(
