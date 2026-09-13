@@ -7,6 +7,7 @@ import struct
 import time
 import copy
 import traceback
+from enum import IntFlag
 from datetime import timedelta
 from threading import RLock, Thread
 from typing import List
@@ -29,6 +30,43 @@ PACKET_FORMATS_BY_SIZE = {
     for packet_format, (packet_size, xor_key) in PACKET_FORMATS.items()
 }
 
+# The simulator packet stores its status flags as a little-endian uint16 at
+# 0x8E. The names are based on the community-reversed GT7 simulator packet
+# format; unknown bits are intentionally preserved in ``GTData.flags``.
+FLAGS_OFFSET = 0x8E
+
+
+class SimulatorFlags(IntFlag):
+    NONE = 0
+    CAR_ON_TRACK = 1 << 0
+    PAUSED = 1 << 1
+    LOADING_OR_PROCESSING = 1 << 2
+    IN_GEAR = 1 << 3
+    HAS_TURBO = 1 << 4
+    REV_LIMITER_ALERT_ACTIVE = 1 << 5
+    HANDBRAKE_ACTIVE = 1 << 6
+    LIGHTS_ACTIVE = 1 << 7
+    HIGH_BEAM_ACTIVE = 1 << 8
+    LOW_BEAM_ACTIVE = 1 << 9
+    ASM_ACTIVE = 1 << 10
+    TCS_ACTIVE = 1 << 11
+
+
+KNOWN_FLAGS_MASK = int(
+    SimulatorFlags.CAR_ON_TRACK
+    | SimulatorFlags.PAUSED
+    | SimulatorFlags.LOADING_OR_PROCESSING
+    | SimulatorFlags.IN_GEAR
+    | SimulatorFlags.HAS_TURBO
+    | SimulatorFlags.REV_LIMITER_ALERT_ACTIVE
+    | SimulatorFlags.HANDBRAKE_ACTIVE
+    | SimulatorFlags.LIGHTS_ACTIVE
+    | SimulatorFlags.HIGH_BEAM_ACTIVE
+    | SimulatorFlags.LOW_BEAM_ACTIVE
+    | SimulatorFlags.ASM_ACTIVE
+    | SimulatorFlags.TCS_ACTIVE
+)
+
 
 def normalise_packet_format(packet_format: str) -> str:
     packet_format = packet_format.strip().upper()
@@ -43,6 +81,26 @@ def normalise_packet_format(packet_format: str) -> str:
 
 class GTData:
     def __init__(self, ddata):
+        # Keep the status fields usable before the first packet arrives.
+        self.raw_flags = 0
+        self.flags = SimulatorFlags.NONE
+        self.unknown_flags = 0
+        self.car_on_track = False
+        self.loading_or_processing = False
+        self.in_gear = False
+        self.has_turbo = False
+        self.rev_limiter_alert_active = False
+        self.handbrake_active = False
+        self.lights_active = False
+        self.high_beam_active = False
+        self.low_beam_active = False
+        self.asm_active = False
+        self.tcs_active = False
+        self.is_paused = False
+        # ``in_race`` is retained as a compatibility name used by the
+        # recording code. It is populated from CAR_ON_TRACK for packets.
+        self.in_race = False
+
         if not ddata:
             return
 
@@ -161,8 +219,26 @@ class GTData:
         self.angular_velocity_y = struct.unpack('f', ddata[0x30:0x30 + 4])[0]  # angular velocity Y
         self.angular_velocity_z = struct.unpack('f', ddata[0x34:0x34 + 4])[0]  # angular velocity Z
 
-        self.is_paused = bin(struct.unpack('B', ddata[0x8E:0x8E + 1])[0])[-2] == '1'
-        self.in_race = bin(struct.unpack('B', ddata[0x8E:0x8E + 1])[0])[-1] == '1'
+        self.raw_flags = struct.unpack_from('<H', ddata, FLAGS_OFFSET)[0]
+        self.flags = SimulatorFlags(self.raw_flags)
+        self.unknown_flags = self.raw_flags & ~KNOWN_FLAGS_MASK
+        self.car_on_track = bool(self.flags & SimulatorFlags.CAR_ON_TRACK)
+        self.is_paused = bool(self.flags & SimulatorFlags.PAUSED)
+        self.loading_or_processing = bool(
+            self.flags & SimulatorFlags.LOADING_OR_PROCESSING
+        )
+        self.in_gear = bool(self.flags & SimulatorFlags.IN_GEAR)
+        self.has_turbo = bool(self.flags & SimulatorFlags.HAS_TURBO)
+        self.rev_limiter_alert_active = bool(
+            self.flags & SimulatorFlags.REV_LIMITER_ALERT_ACTIVE
+        )
+        self.handbrake_active = bool(self.flags & SimulatorFlags.HANDBRAKE_ACTIVE)
+        self.lights_active = bool(self.flags & SimulatorFlags.LIGHTS_ACTIVE)
+        self.high_beam_active = bool(self.flags & SimulatorFlags.HIGH_BEAM_ACTIVE)
+        self.low_beam_active = bool(self.flags & SimulatorFlags.LOW_BEAM_ACTIVE)
+        self.asm_active = bool(self.flags & SimulatorFlags.ASM_ACTIVE)
+        self.tcs_active = bool(self.flags & SimulatorFlags.TCS_ACTIVE)
+        self.in_race = self.car_on_track
 
         # B extends A; both ~ and C include these motion values.
         if len(ddata) >= PACKET_FORMATS["B"][0]:
@@ -492,6 +568,7 @@ class GT7Communication(Thread):
 
         self.current_lap.data_rpm.append(data.rpm)
         self.current_lap.data_gear.append(data.current_gear)
+        self.current_lap.data_flags.append(int(getattr(data, "flags", 0)))
 
         ## Log Position
 

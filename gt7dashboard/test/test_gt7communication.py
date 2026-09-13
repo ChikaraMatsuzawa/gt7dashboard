@@ -32,11 +32,14 @@ def encrypt_packet(plaintext, xor_key, iv1=0x12345678):
     return bytes(encrypted)
 
 
-def packet_for_format(packet_format, magic=gt7communication.PACKET_MAGIC):
+def packet_for_format(
+    packet_format, magic=gt7communication.PACKET_MAGIC, flags=0
+):
     packet_size, xor_key = gt7communication.PACKET_FORMATS[packet_format]
     plaintext = bytearray(packet_size)
     struct.pack_into('<I', plaintext, 0x00, magic)
     struct.pack_into('<I', plaintext, 0x70, 42)
+    struct.pack_into('<H', plaintext, gt7communication.FLAGS_OFFSET, flags)
     return encrypt_packet(plaintext, xor_key)
 
 
@@ -165,6 +168,66 @@ class PacketDecoderTest(unittest.TestCase):
         self.assertIsNone(data.throttle_filtered_percent)
         self.assertIsNone(data.surface_type)
         self.assertIsNone(data.current_lap_time_ms)
+
+    def test_decodes_full_flags_word_for_each_packet_format(self):
+        known_flags = (
+            gt7communication.SimulatorFlags.CAR_ON_TRACK
+            | gt7communication.SimulatorFlags.PAUSED
+            | gt7communication.SimulatorFlags.LOADING_OR_PROCESSING
+            | gt7communication.SimulatorFlags.IN_GEAR
+            | gt7communication.SimulatorFlags.HAS_TURBO
+            | gt7communication.SimulatorFlags.REV_LIMITER_ALERT_ACTIVE
+            | gt7communication.SimulatorFlags.HANDBRAKE_ACTIVE
+            | gt7communication.SimulatorFlags.LIGHTS_ACTIVE
+            | gt7communication.SimulatorFlags.HIGH_BEAM_ACTIVE
+            | gt7communication.SimulatorFlags.LOW_BEAM_ACTIVE
+            | gt7communication.SimulatorFlags.ASM_ACTIVE
+            | gt7communication.SimulatorFlags.TCS_ACTIVE
+        )
+        raw_flags = int(known_flags) | 0x8000
+
+        for packet_format in gt7communication.PACKET_FORMATS:
+            with self.subTest(packet_format=packet_format):
+                data = gt7communication.GTData(
+                    gt7communication.salsa20_dec(
+                        packet_for_format(packet_format, flags=raw_flags)
+                    )
+                )
+
+                self.assertEqual(raw_flags, data.raw_flags)
+                self.assertEqual(raw_flags, int(data.flags))
+                self.assertEqual(0x8000, data.unknown_flags)
+                self.assertTrue(data.car_on_track)
+                self.assertTrue(data.in_race)
+                self.assertTrue(data.is_paused)
+                self.assertTrue(data.loading_or_processing)
+                self.assertTrue(data.in_gear)
+                self.assertTrue(data.has_turbo)
+                self.assertTrue(data.rev_limiter_alert_active)
+                self.assertTrue(data.handbrake_active)
+                self.assertTrue(data.lights_active)
+                self.assertTrue(data.high_beam_active)
+                self.assertTrue(data.low_beam_active)
+                self.assertTrue(data.asm_active)
+                self.assertTrue(data.tcs_active)
+
+    def test_records_raw_flags_alongside_each_telemetry_sample(self):
+        raw_flags = int(
+            gt7communication.SimulatorFlags.CAR_ON_TRACK
+            | gt7communication.SimulatorFlags.TCS_ACTIVE
+        )
+        data = gt7communication.GTData(
+            gt7communication.salsa20_dec(packet_for_format('A', flags=raw_flags))
+        )
+        communication = gt7communication.GT7Communication('192.0.2.1')
+
+        communication._log_data(data)
+
+        self.assertEqual([raw_flags], communication.current_lap.data_flags)
+        self.assertEqual(
+            len(communication.current_lap.data_speed),
+            len(communication.current_lap.data_flags),
+        )
 
     def test_records_packet_b_extension_fields_in_lap(self):
         lap = self.record_extension_packet('B')

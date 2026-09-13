@@ -423,6 +423,7 @@ class TestLaps(unittest.TestCase):
     def test_save_laps_to_json(self):
         l1 = Lap()
         l1.data_boost = [0.6, 0.7, 0.9]
+        l1.data_flags = [1, 0x802, 0x8000]
         l1.data_torque_vector_fl = [1.0, 1.1, 1.2]
         l1.data_torque_vector_fr = [2.0, 2.1, 2.2]
         l1.data_surface_type_fl = ["T", "C", "G"]

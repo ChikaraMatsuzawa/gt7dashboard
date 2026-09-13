@@ -54,6 +54,8 @@ class Lap:
         self.data_time = []
         self.data_rpm = []
         self.data_gear = []
+        # Raw GT7 simulator status flags, one uint16 bitmask per sample.
+        self.data_flags = []
         self.data_tires = []
         # Positions on x,y,z
         self.data_position_x = []
